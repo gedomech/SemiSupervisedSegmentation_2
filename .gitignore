@@ -1,0 +1,8 @@
+# dataset folder
+/dataset/ISIC2018/*
+
+# local files
+*/.idea/
+
+# pre-trained models
+/checkpoint/modified*
