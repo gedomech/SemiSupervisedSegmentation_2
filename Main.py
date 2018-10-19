@@ -17,7 +17,7 @@ from myutils.myVisualize import Dashboard
 import platform
 import torch.backends.cudnn as cudnn
 
-
+torch.set_num_threads(1)
 # Jensen-Shannon Divergence
 def JSD(prob_dists, _weights=None, logbase=2):
     """
@@ -56,11 +56,11 @@ class_number = 2
 lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
-number_workers = 7
-batch_size = 7
-max_epoch = 1  # 100
-train_print_frequncy = 1  # 10
-val_print_frequncy = 1  # 10
+number_workers = 4
+batch_size = 1
+max_epoch = 100
+train_print_frequncy = 10
+val_print_frequncy = 10
 ## visualization
 board_train_image = Dashboard(server='http://localhost', env="image_train")
 board_test_image = Dashboard(server='http://localhost', env="image_test")
@@ -90,12 +90,14 @@ segnet = SegNet(class_number)  # SegNet network
 nets = [net, unet, segnet]
 
 for i, net_i in enumerate(nets):
-    nets[i] = net_i if (torch.cuda.is_available() and use_cuda) else net_i
+    nets[i] = net_i.cuda() if (torch.cuda.is_available() and use_cuda) else net_i
+#import ipdb
+#ipdb.set_trace()
 
-if (use_cuda and torch.cuda.is_available()):
-    for i, net_i in enumerate(nets):
-        nets[net_i] = torch.nn.DataParallel(net_i)
-    cudnn.benchmark = True
+#if (use_cuda and torch.cuda.is_available()):
+#    for i, net_i in enumerate(nets):
+#        nets[net_i] = torch.nn.DataParallel(net_i)
+#    cudnn.benchmark = True
 map_location = lambda storage, loc: storage
 
 optiENet = torch.optim.Adam(nets[0].parameters(), lr=lr, weight_decay=weigth_decay)
@@ -316,14 +318,14 @@ def test(nets_, test_loader_):
             if highest_iou_unet < iou_meters_test[idx].value()[0]:
                 highest_iou = iou_meters_test[idx].value()[0]
                 torch.save(nets[idx].state_dict(),
-                           'checkpoint/modified_ENet_%.3f_%s.pth' % (
+                           'checkpoint/modified_UNet_%.3f_%s.pth' % (
                            iou_meters_test[idx].value()[0], 'equal_' + str(Equalize)))
                 print('The highest IOU is:%.3f' % iou_meters_test[idx].value()[0], 'Model saved.')
         else:
             if highest_iou_segnet < iou_meters_test[idx].value()[0]:
                 highest_iou = iou_meters_test[idx].value()[0]
                 torch.save(nets[idx].state_dict(),
-                           'checkpoint/modified_ENet_%.3f_%s.pth' % (
+                           'checkpoint/modified_SegNet_%.3f_%s.pth' % (
                            iou_meters_test[idx].value()[0], 'equal_' + str(Equalize)))
                 print('The highest IOU is:%.3f' % iou_meters_test[idx].value()[0], 'Model saved.')
 
