@@ -12,7 +12,7 @@ from myutils.myLoss import CrossEntropyLoss2d, JensenShannonDivergence
 
 from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
-from myutils.myUtils import pred2segmentation, iou_loss, showImages
+from myutils.myUtils import pred2segmentation, iou_loss, showImages, dice_loss
 from myutils.myVisualize import Dashboard
 import platform
 import torch.backends.cudnn as cudnn
@@ -58,6 +58,7 @@ weigth_decay = 1e-6
 use_cuda = True
 number_workers = 4
 batch_size = 1
+max_epoch_pre = 25
 max_epoch = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -128,7 +129,7 @@ def pre_train():
 
     iou_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    for epoch in range(max_epoch):
+    for epoch in range(max_epoch_pre):
 
         for idx, _ in enumerate(nets):
             iou_meters[idx].reset()
@@ -174,7 +175,7 @@ def pre_train():
                 else:
                     torch.save(net_i.state_dict(), 'checkpoint/modified_SegNet_pre-trained.pth')
 
-            train(nets, labeled_loader, unlabeled_loader)
+    train(nets, labeled_loader, unlabeled_loader)
 
 
 def train(nets_, labeled_loader_, unlabeled_loader_):
@@ -192,6 +193,7 @@ def train(nets_, labeled_loader_, unlabeled_loader_):
     loss_ensemble_meter = AverageValueMeter()
 
     for epoch in range(max_epoch):
+        print('epoch = {0:8d}/{1:8d}'.format(epoch, max_epoch))
 
         for idx, _ in enumerate(nets_):
             iou_meters[idx].reset()
@@ -257,7 +259,6 @@ def train(nets_, labeled_loader_, unlabeled_loader_):
         ensemble_probs = torch.cat([enet_prob, unet_prob, segnet_prob], 0)
 
         jsd_loss = ensemble_criterion(ensemble_probs)
-        print(jsd_loss)
 
         loss_ensemble_meter.add(jsd_loss.item())
 
@@ -275,6 +276,7 @@ def test(nets_, test_loader_):
     for net_i in nets_:
         net_i.eval()
     iou_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+    dice_losses = []
     loss_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     for idx, _ in enumerate(nets_):
         iou_meters_test[idx].reset()
@@ -289,8 +291,9 @@ def test(nets_, test_loader_):
             optimizers[idx].step()
             loss_meters_test[idx].add(loss_test.item())
             iou_test = iou_loss(pred2segmentation(pred_test), mask.squeeze(1).float(), class_number)[1]
-            #loss_meters_test[idx].add(loss.item())
+            dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
             iou_meters_test[idx].add(iou_test)
+            dice_losses.append(dice_test)
         if i % val_print_frequncy == 0:
             showImages(board_test_image, img, mask, pred2segmentation(pred_test))
 
@@ -313,21 +316,31 @@ def test(nets_, test_loader_):
                 torch.save(nets[idx].state_dict(),
                            'checkpoint/modified_ENet_%.3f_%s.pth' % (
                            iou_meters_test[idx].value()[0], 'equal_' + str(Equalize)))
-                print('The highest IOU is:%.3f' % iou_meters_test[idx].value()[0], 'Model saved.')
+                print('The highest IOU is:{:.3f} {}'.format(iou_meters_test[idx].value()[0], 'Model saved.'))
         elif idx == 1:
             if highest_iou_unet < iou_meters_test[idx].value()[0]:
                 highest_iou = iou_meters_test[idx].value()[0]
                 torch.save(nets[idx].state_dict(),
                            'checkpoint/modified_UNet_%.3f_%s.pth' % (
                            iou_meters_test[idx].value()[0], 'equal_' + str(Equalize)))
-                print('The highest IOU is:%.3f' % iou_meters_test[idx].value()[0], 'Model saved.')
+                print('The highest IOU is:{:.3f} {}'.format(iou_meters_test[idx].value()[0], 'Model saved.'))
         else:
             if highest_iou_segnet < iou_meters_test[idx].value()[0]:
                 highest_iou = iou_meters_test[idx].value()[0]
                 torch.save(nets[idx].state_dict(),
                            'checkpoint/modified_SegNet_%.3f_%s.pth' % (
                            iou_meters_test[idx].value()[0], 'equal_' + str(Equalize)))
-                print('The highest IOU is:%.3f' % iou_meters_test[idx].value()[0], 'Model saved.')
+                print('The highest IOU is:{:.3f} {}'.format(iou_meters_test[idx].value()[0], 'Model saved.'))
+
+    # determining best model based on dice criterion
+    highest_dice_idx = torch.tensor(dice_losses).argmax(0)
+
+    if highest_dice_idx == 0:
+        print('The best model is ENet with the highest dice loss of {:.3f}'.format(dice_losses[highest_dice_idx].item()))
+    elif highest_dice_idx == 1:
+        print('The best model is UNet with the highest dice loss of {:.3f}'.format(dice_losses[highest_dice_idx].item()))
+    elif highest_dice_idx == 2:
+        print('The best model is SegNet with the highest dice loss of {:.3f}'.format(dice_losses[highest_dice_idx].item()))
 
 
 if __name__ == "__main__":
