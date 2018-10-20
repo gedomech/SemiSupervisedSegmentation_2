@@ -55,7 +55,7 @@ weigth_decay = 1e-6
 use_cuda = True
 number_workers = 4
 batch_size = 1
-max_epoch_pre = 50
+max_epoch_pre = 100
 max_epoch = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -271,19 +271,22 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         distributions = None
         img, _, _ = unlabeled_batch
         img = img.cuda() if (torch.cuda.is_available() and use_cuda) else img
-        # computing nets output
+        # computing the majority voting from the output nets
+        for idx, net_i in enumerate(nets):
+            pred = nets[idx](img)
+            distributions += F.softmax(pred, dim=1)
+
+        distributions /= 3
+
         for idx, net_i in enumerate(nets):
             optimizers[idx].zero_grad()
             pred = nets[idx](img)
-            distributions += F.softmax(pred, dim=1)
-            loss = criterion(pred, mask.squeeze(1))
+            loss = criterion(pred2segmentation(pred), distributions.squeeze(1))
             loss.backward()
             optimizers[idx].step()
 
         distributions /= 3
         mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
-
-
 
         # testing segmentation nets
         # test(nets_, test_loader)
@@ -460,13 +463,6 @@ def test_baseline(nets_, test_loader_):
 
     # determining best model based on dice criterion
     highest_dice_idx = torch.tensor(dice_losses).argmax(0)
-
-    if highest_dice_idx == 0:
-        print('The best model is ENet with the highest dice loss of {:.3f}'.format(dice_losses[highest_dice_idx].item()))
-    elif highest_dice_idx == 1:
-        print('The best model is UNet with the highest dice loss of {:.3f}'.format(dice_losses[highest_dice_idx].item()))
-    elif highest_dice_idx == 2:
-        print('The best model is SegNet with the highest dice loss of {:.3f}'.format(dice_losses[highest_dice_idx].item()))
 
 
 def train_baseline(nets_, test_loader_):
