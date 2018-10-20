@@ -286,11 +286,11 @@ def test_baseline(nets_, test_loader_):
 
 
 if __name__ == "__main__":
-    # pre_train()
-    nets_path = ['checkpoint/best_ENet_pre-trained.pth',
-                 'checkpoint/best_UNet_pre-trained.pth',
-                 'checkpoint/best_SegNet_pre-trained.pth']
-    train_baseline(nets, nets_path, labeled_loader, unlabeled_loader)
+    pre_train()
+    # # nets_path = ['checkpoint/best_ENet_pre-trained.pth',
+    #              'checkpoint/best_UNet_pre-trained.pth',
+    #              'checkpoint/best_SegNet_pre-trained.pth']
+    # train_baseline(nets, nets_path, labeled_loader, unlabeled_loader)
 
 
 
