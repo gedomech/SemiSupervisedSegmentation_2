@@ -15,7 +15,7 @@ from myutils.myUtils import pred2segmentation, iou_loss, showImages, dice_loss
 from myutils.myVisualize import Dashboard
 
 torch.set_num_threads(1)
-cuda_device = "0"
+
 root = "datasets/ISIC2018"
 
 class_number = 2
@@ -93,16 +93,16 @@ def pre_train():
                  'checkpoint/best_UNet_pre-trained.pth',
                  'checkpoint/best_SegNet_pre-trained.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+
     for epoch in range(max_epoch_pre):
 
         for idx, _ in enumerate(nets):
             dice_meters[idx].reset()
-            loss_meters[idx].reset()
+
         if epoch % 5 == 0:
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
-                    param_group['lr'] = param_group['lr'] * (0.95 ** (epoch // 10))
+                    param_group['lr'] = param_group['lr'] * (0.95)
                     print('learning rate:', param_group['lr'])
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_loader)):
@@ -114,42 +114,43 @@ def pre_train():
                 loss = criterion(pred, mask.squeeze(1))
                 loss.backward()
                 optimizers[idx].step()
-                loss_meters[idx].add(loss.item())
-                dice = dice_loss(pred2segmentation(pred), mask.squeeze(1))
-                loss_meters[idx].add(loss.item())
-                dice_meters[idx].add(dice)
+
+                # dice = dice_loss(pred2segmentation(pred), mask.squeeze(1))
+                #
+                # dice_meters[idx].add(dice)
 
                 if i % train_print_frequncy == 0:
                     showImages(board_train_image, img, mask, pred2segmentation(pred))
-            for idx, _ in enumerate(nets):
-                if idx == 0:
-                    board_loss.plot('train_dice_per_epoch for ENet', dice_meters[idx].value()[0])
-                    board_loss.plot('train_loss_per_epoch ENet', loss_meters[idx].value()[0])
-                elif idx == 1:
-                    board_loss.plot('train_dice_per_epoch UNet', dice_meters[idx].value()[0])
-                    board_loss.plot('train_loss_per_epoch UNet', loss_meters[idx].value()[0])
-                else:
-                    board_loss.plot('train_dice_per_epoch SegNet', dice_meters[idx].value()[0])
-                    board_loss.plot('train_loss_per_epoch SegNet', loss_meters[idx].value()[0])
-
-            for idx, net_i in enumerate(nets):
-                if (idx == 0) and (highest_dice_enet < dice_meters[idx].value()[0].item()):
-                    highest_dice_enet = dice_meters[idx].value()[0].item()
-                    print('epoch = {:4d}/{:4d} the highest dice for ENet is {:.3f}'.format(epoch, max_epoch,
-                                                                                         highest_dice_enet))
-                    torch.save(net_i.state_dict(), nets_path[0])
-
-                elif (idx == 1) and (highest_dice_unet < dice_meters[idx].value()[0].item()):
-                    highest_dice_unet = dice_meters[idx].value()[0].item()
-                    print('epoch = {:4d}/{:4d} the highest dice for UNet is {:.3f}'.format(epoch, max_epoch,
-                                                                                         highest_dice_unet))
-                    torch.save(net_i.state_dict(), nets_path[1])
-
-                elif (idx == 2) and (highest_dice_segnet < dice_meters[idx].value()[0].item()):
-                    highest_dice_segnet = dice_meters[idx].value()[0].item()
-                    print('epoch = {:4d}/{:4d} the highest dice for SegNet is {:.3f}'.format(epoch, max_epoch,
-                                                                                           highest_dice_segnet))
-                    torch.save(net_i.state_dict(), nets_path[2])
+            # for idx, _ in enumerate(nets):
+            #     if idx == 0:
+            #         board_loss.plot('train_dice_per_epoch for ENet', dice_meters[idx].value()[0])
+            #
+            #     elif idx == 1:
+            #         board_loss.plot('train_dice_per_epoch UNet', dice_meters[idx].value()[0])
+            #
+            #     else:
+            #         board_loss.plot('train_dice_per_epoch SegNet', dice_meters[idx].value()[0])
+            #
+            #
+            # for idx, net_i in enumerate(nets):
+            #     if (idx == 0) and (highest_dice_enet < dice_meters[idx].value()[0].item()):
+            #         highest_dice_enet = dice_meters[idx].value()[0].item()
+            #         print('epoch = {:4d}/{:4d} the highest dice for ENet is {:.3f}'.format(epoch, max_epoch,
+            #                                                                              highest_dice_enet))
+            #         torch.save(net_i.state_dict(), nets_path[0])
+            #
+            #     elif (idx == 1) and (highest_dice_unet < dice_meters[idx].value()[0].item()):
+            #         highest_dice_unet = dice_meters[idx].value()[0].item()
+            #         print('epoch = {:4d}/{:4d} the highest dice for UNet is {:.3f}'.format(epoch, max_epoch,
+            #                                                                              highest_dice_unet))
+            #         torch.save(net_i.state_dict(), nets_path[1])
+            #
+            #     elif (idx == 2) and (highest_dice_segnet < dice_meters[idx].value()[0].item()):
+            #         highest_dice_segnet = dice_meters[idx].value()[0].item()
+            #         print('epoch = {:4d}/{:4d} the highest dice for SegNet is {:.3f}'.format(epoch, max_epoch,
+            #                                                                                highest_dice_segnet))
+            #         torch.save(net_i.state_dict(), nets_path[2])
+        test_baseline(nets, test_loader)
 
     train_baseline(nets, nets_path, labeled_loader, unlabeled_loader)
 
@@ -246,7 +247,7 @@ def test_baseline(nets_, test_loader_):
     for net_i in nets_:
         net_i.eval()
     dice_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    loss_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+
     mv_dice_score_meter = AverageValueMeter()
     for idx, _ in enumerate(nets_):
         dice_meters_test[idx].reset()
@@ -256,8 +257,6 @@ def test_baseline(nets_, test_loader_):
         for idx, net_i in enumerate(nets):
             pred_test = nets[idx](img)
             distributions += F.softmax(pred_test,1)
-            loss_test = criterion(pred_test, mask.squeeze(1))
-            loss_meters_test[idx].add(loss_test.item())
             dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
             dice_meters_test[idx].add(dice_test)
 
@@ -267,8 +266,12 @@ def test_baseline(nets_, test_loader_):
         if i % val_print_frequncy == 0:
             showImages(board_test_image, img, mask, pred2segmentation(distributions))
 
-    net.train()
-    for idx, net_i in enumerate(nets):
+    for net_i in nets_:
+        net_i.train()
+
+
+    for idx, net_i in enumerate(nets_):
+
         if (idx == 0) and (highest_dice_enet < mv_dice_score_meter[idx].value()[0].item()):
             highest_dice_enet = mv_dice_score_meter[idx].value()[0].item()
             print('The highest dice for ENet is {:.3f}'.format(highest_dice_enet))
