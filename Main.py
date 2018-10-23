@@ -23,15 +23,9 @@ lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
 number_workers = 4
-<<<<<<< HEAD
-batch_size = 4
-max_epoch_pre = 100
-max_epoch = 100
-=======
 batch_size = 4 # 1
 max_epoch_pre = 100 # 1
 max_epoch = 100 # 1
->>>>>>> eeb49676c0120854e88cfce143d8f5bfc2930aa8
 train_print_frequncy = 10
 val_print_frequncy = 10
 ## visualization
