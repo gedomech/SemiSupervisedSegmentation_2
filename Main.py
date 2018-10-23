@@ -244,8 +244,9 @@ def test(nets_, nets_path_, test_loader_):
     global highest_dice_enet
     global highest_dice_unet
     global highest_dice_segnet
-    for net_i in nets_:
-        net_i.eval()
+    for i, net_i in enumerate(nets_):
+        nets_[i] = net_i.cuda() if (torch.cuda.is_available() and use_cuda) else net_i
+        nets_[i].eval()
     dice_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     mv_dice_score_meter = AverageValueMeter()
