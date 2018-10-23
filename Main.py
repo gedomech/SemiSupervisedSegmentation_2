@@ -259,6 +259,8 @@ def test(nets_, nets_path_, test_loader_):
             pred_test = nets[idx](img)
             print(type(pred_test))
             distributions += F.softmax(pred_test, 1).data.cpu()
+            print("pred2segmentation(pred_test)", type(pred2segmentation(pred_test)),
+                  "mask.squeeze(1)", type(mask.squeeze(1)))
             dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
             dice_meters_test[idx].add(dice_test)
 
