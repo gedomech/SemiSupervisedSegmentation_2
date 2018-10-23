@@ -150,7 +150,7 @@ def pre_train():
             #         print('epoch = {:4d}/{:4d} the highest dice for SegNet is {:.3f}'.format(epoch, max_epoch,
             #                                                                                highest_dice_segnet))
             #         torch.save(net_i.state_dict(), nets_path[2])
-        test_baseline(nets, test_loader)
+        test(nets, nets_path, test_loader)
 
     train_baseline(nets, nets_path, labeled_loader, unlabeled_loader)
 
@@ -165,6 +165,9 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         net_i.train()
 
     global  highest_mv_dice_score
+    nets_path = ['checkpoint/best_ENet_baseline.pth',
+                 'checkpoint/best_UNet_baseline.pth',
+                 'checkpoint/best_SegNet_baseline.pth']
     labeled_loader_iter = enumerate(labeled_loader_)
     unlabeled_loader_iter = enumerate(unlabeled_loader_)
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
@@ -231,19 +234,16 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             print('epoch = {0:8d}/{1:8d} the highest mv dice score is {2:.3f}.'.format(epoch, max_epoch, highest_mv_dice_score))
 
         # testing segmentation nets
-        test_baseline(nets_, test_loader)
+        test(nets_, nets_path, test_loader)
 
 
-def test_baseline(nets_, test_loader_):
+def test(nets_, nets_path_, test_loader_):
     """
     This function performs the evaluation with the test set containing labeled images.
     """
     global highest_dice_enet
     global highest_dice_unet
     global highest_dice_segnet
-    path_enet = 'checkpoint/best_ENet_baseline.pth'
-    path_unet = 'checkpoint/best_UNet_baseline.pth'
-    path_segnet = 'checkpoint/best_SegNet_baseline.pth'
     for net_i in nets_:
         net_i.eval()
     dice_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
@@ -269,23 +269,22 @@ def test_baseline(nets_, test_loader_):
     for net_i in nets_:
         net_i.train()
 
-
     for idx, net_i in enumerate(nets_):
 
-        if (idx == 0) and (highest_dice_enet < mv_dice_score_meter[idx].value()[0].item()):
-            highest_dice_enet = mv_dice_score_meter[idx].value()[0].item()
+        if (idx == 0) and (highest_dice_enet < mv_dice_score_meter.value()[0]):
+            highest_dice_enet = mv_dice_score_meter.value()[0]
             print('The highest dice for ENet is {:.3f}'.format(highest_dice_enet))
-            torch.save(net_i.state_dict(), path_enet)
+            torch.save(net_i.state_dict(), nets_path_[idx])
 
-        elif (idx == 1) and (highest_dice_unet < mv_dice_score_meter[idx].value()[0].item()):
-            highest_dice_unet = mv_dice_score_meter[idx].value()[0].item()
+        elif (idx == 1) and (highest_dice_unet < mv_dice_score_meter.value()[0]):
+            highest_dice_unet = mv_dice_score_meter.value()[0]
             print('The highest dice for UNet is {:.3f}'.format(highest_dice_unet))
-            torch.save(net_i.state_dict(), path_unet)
+            torch.save(net_i.state_dict(), nets_path_[idx])
 
-        elif (idx == 2) and (highest_dice_segnet < mv_dice_score_meter[idx].value()[0].item()):
-            highest_dice_segnet = mv_dice_score_meter[idx].value()[0].item()
+        elif (idx == 2) and (highest_dice_segnet < mv_dice_score_meter.value()[0]):
+            highest_dice_segnet = mv_dice_score_meter.value()[0]
             print('The highest dice for SegNet is {:.3f}'.format(highest_dice_segnet))
-            torch.save(net_i.state_dict(), path_segnet)
+            torch.save(net_i.state_dict(), nets_path_[idx])
 
 
 if __name__ == "__main__":
