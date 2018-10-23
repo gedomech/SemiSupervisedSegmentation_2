@@ -23,9 +23,15 @@ lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
 number_workers = 4
+<<<<<<< HEAD
 batch_size = 4
 max_epoch_pre = 100
 max_epoch = 100
+=======
+batch_size = 4 # 1
+max_epoch_pre = 100 # 1
+max_epoch = 100 # 1
+>>>>>>> eeb49676c0120854e88cfce143d8f5bfc2930aa8
 train_print_frequncy = 10
 val_print_frequncy = 10
 ## visualization
@@ -244,8 +250,9 @@ def test(nets_, nets_path_, test_loader_):
     global highest_dice_enet
     global highest_dice_unet
     global highest_dice_segnet
-    for net_i in nets_:
-        net_i.eval()
+    for i, net_i in enumerate(nets_):
+        nets_[i] = net_i.cuda() if (torch.cuda.is_available() and use_cuda) else net_i
+        nets_[i].eval()
     dice_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     mv_dice_score_meter = AverageValueMeter()
