@@ -254,6 +254,7 @@ def test(nets_, nets_path_, test_loader_):
     for i, (img, mask, _) in tqdm(enumerate(test_loader_)):
         (img, mask) = (img.cuda(), mask.cuda()) if (torch.cuda.is_available() and use_cuda) else (img, mask)
         distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
+        distributions.cuda()
         for idx, net_i in enumerate(nets):
             pred_test = nets[idx](img)
             distributions += F.softmax(pred_test,1)
