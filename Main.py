@@ -15,7 +15,6 @@ from myutils.myUtils import pred2segmentation, iou_loss, showImages, dice_loss
 from myutils.myVisualize import Dashboard
 
 torch.set_num_threads(1) #set by deafault to 1
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
 root = "datasets/ISIC2018"
 
 class_number = 2
