@@ -15,7 +15,6 @@ from myutils.myUtils import pred2segmentation, iou_loss, showImages, dice_loss
 from myutils.myVisualize import Dashboard
 
 torch.set_num_threads(1) #set by deafault to 1
-cuda_device = "3"
 root = "datasets/ISIC2018"
 
 class_number = 2
@@ -57,7 +56,7 @@ segnet = SegNet(class_number)  # SegNet network
 nets = [net, unet, segnet]
 
 for i, net_i in enumerate(nets):
-    nets[i] = net_i.cuda(cuda_device) if (torch.cuda.is_available() and use_cuda) else net_i
+    nets[i] = net_i.cuda() if (torch.cuda.is_available() and use_cuda) else net_i
 
 map_location = lambda storage, loc: storage
 
@@ -69,7 +68,7 @@ optimizers = [optiENet, optiUNet, optiSegNet]
 ## loss
 class_weigth = [1 * 0.1, 3.53]
 class_weigth = torch.Tensor(class_weigth)
-criterion = CrossEntropyLoss2d(class_weigth).cuda(cuda_device) if (torch.cuda.is_available() and use_cuda) else CrossEntropyLoss2d(
+criterion = CrossEntropyLoss2d(class_weigth).cuda() if (torch.cuda.is_available() and use_cuda) else CrossEntropyLoss2d(
     class_weigth)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 
@@ -106,7 +105,7 @@ def pre_train():
                     print('learning rate:', param_group['lr'])
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_loader)):
-            (img, mask) = (img.cuda(cuda_device), mask.cuda(cuda_device)) if (torch.cuda.is_available() and use_cuda) else (img, mask)
+            (img, mask) = (img.cuda(), mask.cuda()) if (torch.cuda.is_available() and use_cuda) else (img, mask)
 
             for idx, net_i in enumerate(nets):
                 optimizers[idx].zero_grad()
@@ -191,7 +190,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             _, labeled_batch = labeled_loader_iter.__next__()
 
         img, mask, _ = labeled_batch
-        (img, mask) = (img.cuda(cuda_device), mask.cuda(cuda_device)) if (torch.cuda.is_available() and use_cuda) else (img, mask)
+        (img, mask) = (img.cuda(), mask.cuda()) if (torch.cuda.is_available() and use_cuda) else (img, mask)
         for idx, net_i in enumerate(nets):
             optimizers[idx].zero_grad()
             pred = nets[idx](img)
@@ -212,7 +211,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             _, unlabeled_batch = unlabeled_loader_iter.__next__()
 
         img, _, _ = unlabeled_batch
-        img = img.cuda(cuda_device) if (torch.cuda.is_available() and use_cuda) else img
+        img = img.cuda() if (torch.cuda.is_available() and use_cuda) else img
         # computing the majority voting from the output nets
         distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
         for idx, net_i in enumerate(nets):
@@ -245,7 +244,7 @@ def test(nets_, nets_path_, test_loader_):
     global highest_dice_unet
     global highest_dice_segnet
     for i, net_i in enumerate(nets_):
-        nets_[i] = net_i.cuda(cuda_device) if (torch.cuda.is_available() and use_cuda) else net_i
+        nets_[i] = net_i.cuda() if (torch.cuda.is_available() and use_cuda) else net_i
         nets_[i].eval()
     dice_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
@@ -253,7 +252,7 @@ def test(nets_, nets_path_, test_loader_):
     for idx, _ in enumerate(nets_):
         dice_meters_test[idx].reset()
     for i, (img, mask, _) in tqdm(enumerate(test_loader_)):
-        (img, mask) = (img.cuda(cuda_device), mask.cuda(cuda_device)) if (torch.cuda.is_available() and use_cuda) else (img, mask)
+        (img, mask) = (img.cuda(), mask.cuda()) if (torch.cuda.is_available() and use_cuda) else (img, mask)
         distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
         for idx, net_i in enumerate(nets):
             pred_test = nets[idx](img)
