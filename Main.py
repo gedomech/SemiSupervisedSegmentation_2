@@ -216,6 +216,102 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
         test(nets_, nets_path, test_data, method='A')
 
 
+def train_ensemble(nets_, labeled_loader_, unlabeled_loader_):
+    """
+    train_ensemble function performs the ensemble training with the unlabeled subset.
+    """
+    for net_i in nets_:
+        net_i.train()
+
+    labeled_loader_iter = enumerate(labeled_loader)
+    unlabeled_loader_iter = enumerate(unlabeled_loader)
+
+    nets_path = ['checkpoint/best_ENet_ensemble.pth',
+                 'checkpoint/best_UNet_ensemble.pth',
+                 'checkpoint/best_SegNet_ensemble.pth']
+
+    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+    loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+    loss_ensemble_meter = AverageValueMeter()
+
+    for epoch in range(max_epoch):
+        print('epoch = {0:8d}/{1:8d}'.format(epoch, max_epoch))
+
+        for idx, _ in enumerate(nets_):
+            dice_meters[idx].reset()
+            loss_meters[idx].reset()
+        if epoch % 5 == 0:
+            for opti_i in optimizers:
+                for param_group in opti_i.param_groups:
+                    param_group['lr'] = param_group['lr'] * (0.95 ** (epoch // 10))
+                    print('learning rate:', param_group['lr'])
+
+        # train with labeled data
+        try:
+            _, labeled_batch = labeled_loader_iter.__next__()
+        except:
+            labeled_loader_iter = enumerate(labeled_loader_)
+            _, labeled_batch = labeled_loader_iter.__next__()
+
+        img, mask, _ = labeled_batch
+        (img, mask) = (img.cuda(), mask.cuda()) if (torch.cuda.is_available() and use_cuda) else (img, mask)
+
+        optiENet.zero_grad()
+        optiUNet.zero_grad()
+        optiSegNet.zero_grad()
+
+        pred_enet = nets_[0](img)
+        pred_unet = nets_[1](img)
+        pred_segnet = nets_[2](img)
+
+        loss_enet = criterion(pred_enet, mask.squeeze(1))
+        loss_unet = criterion(pred_unet, mask.squeeze(1))
+        loss_segnet = criterion(pred_segnet, mask.squeeze(1))
+
+        loss_enet.backward()
+        loss_unet.backward()
+        loss_segnet.backward()
+
+        optiENet.step()
+        optiUNet.step()
+        optiSegNet.step()
+
+        # computing loss
+        loss_ensemble_meter.add(loss_enet.item())
+        loss_ensemble_meter.add(loss_unet.item())
+        loss_ensemble_meter.add(loss_segnet.item())
+
+        # train with unlabeled data
+        try:
+            _, unlabeled_batch = unlabeled_loader_iter.__next__()
+        except:
+            unlabeled_loader_iter = enumerate(unlabeled_loader_)
+            _, unlabeled_batch = unlabeled_loader_iter.__next__()
+
+        img, _, _ = unlabeled_batch
+        img = img.cuda() if (torch.cuda.is_available() and use_cuda) else img
+
+        optimizers[0].zero_grad()  # ENet optimizer
+        optimizers[1].zero_grad()  # UNet optimizer
+        optimizers[2].zero_grad()  # SegNet optimizer
+        # computing nets output
+        enet_prob = F.softmax(nets_[0](img), dim=1)  # ENet output
+        unet_prob = F.softmax(nets_[1](img), dim=1)  # UNet output
+        segnet_prob = F.softmax(nets_[1](img), dim=1)  # SegNet output
+        ensemble_probs = torch.cat([enet_prob, unet_prob, segnet_prob], 0)
+
+        jsd_loss = ensemble_criterion(ensemble_probs)
+        jsd_loss.backward()
+        optimizers[0].step()
+        optimizers[1].step()
+        optimizers[2].step()
+
+        #board_loss.plot('train_loss_per_epoch SegNet', loss_ensemble_meter.value()[0])
+
+        # testing segmentation nets
+        test(nets_, nets_path, test_loader)
+
+
 def test(nets_, nets_path_, test_loader_):
     """
     This function performs the evaluation with the test set containing labeled images.

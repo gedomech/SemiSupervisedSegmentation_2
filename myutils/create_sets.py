@@ -4,6 +4,8 @@ import sys
 import shutil
 import errno
 
+import numpy as np
+
 
 # TODO: optimize this function
 def listFiles(top_dir='.', exten='.jpg'):
@@ -46,9 +48,9 @@ def createSemisupervisedSets(root, img_path_list, n_imgs=20, labeled_portion=0.2
     print("Number of samples in the unlabeled train set: ", n_imgs - n_labeled_imgs - n_test_imgs)
 
     if os.path.exists(root):
-        test_file = open(os.path.join(root, 'test.csv'), 'w')
-        labeled_file = open(os.path.join(root, 'labeled_tr.csv'), 'w')
-        unlabeled_file = open(os.path.join(root, 'unlabeled_tr.csv'), 'w')
+        test_file = open(os.path.join(root, 'random_test.csv'), 'w')
+        labeled_file = open(os.path.join(root, 'random_labeled_tr.csv'), 'w')
+        unlabeled_file = open(os.path.join(root, 'random_unlabeled_tr.csv'), 'w')
 
         test_file.write('img,label\n')
         labeled_file.write('img,label\n')
@@ -68,9 +70,11 @@ def createSemisupervisedSets(root, img_path_list, n_imgs=20, labeled_portion=0.2
 
 
 if __name__ == "__main__":
-    root_dir = '/home/guillermo/Documents/ETS_ResearchInternship/ISIC2018paperBaseline/datasets/ISIC2018'
+    root_dir = '/home/guillermo/Documents/InternshipETS/SemiSupervisedSegmentation_2/datasets/ISIC2018'
 
-    img_path_list = sorted(listFiles(os.path.join(root_dir, 'ISIC2018_Task1-2_Training_Input'), exten='.jpg'))
+    img_path_list = listFiles(os.path.join(root_dir, 'ISIC2018_Task1-2_Training_Input'),
+                                                exten='.jpg')
+    np.random.shuffle(img_path_list)
     n_imgs = len(img_path_list)
 
     # create train and validation sets
@@ -79,7 +83,8 @@ if __name__ == "__main__":
     # # create train and validation sets
     # createLabeledUnlabeledSets(root_dir, img_path_list, n_imgs=n_imgs, labeled_portion=0.3)
 
-    createSemisupervisedSets(root_dir, img_path_list, n_imgs=n_imgs, labeled_portion=0.2, test_portion=0.2)
+    createSemisupervisedSets(os.path.join(root_dir, 'ISIC_Segmenation_dataset_split'),
+                             img_path_list, n_imgs=n_imgs, labeled_portion=0.2, test_portion=0.2)
 
 
 
