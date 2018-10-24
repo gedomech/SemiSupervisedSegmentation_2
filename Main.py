@@ -231,7 +231,10 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         mv_dice_score = dice_loss(pred2segmentation(distributions.cuda()), mask.squeeze(1))
         if highest_mv_dice_score > mv_dice_score.item():
             highest_mv_dice_score = mv_dice_score.item()
-            print('epoch = {0:8d}/{1:8d} the highest mv dice score is {2:.3f}.'.format(epoch, max_epoch, highest_mv_dice_score))
+            print('epoch = {0:8d}/{1:8d} the highest mv dice score is {2:.3f}.'.format(epoch, max_epoch,
+                                                                                       highest_mv_dice_score))
+        else:
+            print('epoch = {0:8d}/{1:8d} the mv dice score is {2:.3f}.'.format(epoch, max_epoch, mv_dice_score.item()))
 
         # testing segmentation nets
         test(nets_, nets_path, test_loader)
