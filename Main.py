@@ -1,4 +1,5 @@
-import sys, os
+import os
+import sys
 
 sys.path.extend([os.path.dirname(os.getcwd())])
 import torch
@@ -11,8 +12,8 @@ from myutils.myLoss import CrossEntropyLoss2d, JensenShannonDivergence
 import warnings
 from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
-from myutils.myUtils import pred2segmentation, iou_loss, showImages, dice_loss
-from myutils.myVisualize import Dashboard
+from myutils.myUtils import pred2segmentation, dice_loss
+
 warnings.filterwarnings('ignore')
 
 torch.set_num_threads(3)  # set by deafault to 1
@@ -211,11 +212,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
                 total_loss = lloss_list[idx] + u_loss[idx]
                 total_loss.backward()
                 optimizers[idx].step()
-
-
-
-
-
 
         test(nets_, nets_path, test_data, method='A')
 
