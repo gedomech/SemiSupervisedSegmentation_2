@@ -258,7 +258,7 @@ def test(nets_, nets_path_, test_loader_):
         for idx, net_i in enumerate(nets):
             pred_test = nets[idx](img)
             distributions += F.softmax(pred_test.cpu(), 1)
-            dice_test = dice_loss(pred_test, mask.squeeze(1))
+            dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
             dice_meters_test[idx].add(dice_test)
 
         distributions /= 3
