@@ -28,6 +28,7 @@ number_workers = 0
 batch_size = 1
 max_epoch_pre = 0
 max_epoch_baseline = 100
+max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
@@ -81,6 +82,7 @@ highest_dice_enet = -1
 highest_dice_unet = -1
 highest_dice_segnet = -1
 highest_mv_dice_score = -1
+highest_jsd_dice_score = -1
 
 def batch_iteration(dataloader:DataLoader)->tuple:
     try:
@@ -167,10 +169,10 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
         img, mask = img.to(device), mask.to(device)
         lloss_list= []
 
-        for idx, net_i in enumerate(nets):
+        for idx, net_i in enumerate(nets_):
 
             optimizers[idx].zero_grad()
-            pred = nets[idx](img)
+            pred = nets_[idx](img)
             labeled_loss = criterion(pred, mask.squeeze(1))
             dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
             dice_meters[idx].add(dice_score)
@@ -179,7 +181,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
                 optimizers[idx].step()
             if method=='A':
                 lloss_list.append(labeled_loss)
-
 
         # train with unlabeled data
         unlabeled_batch = batch_iteration(unlabeled_loader_)
@@ -195,9 +196,9 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
         distributions /= 3
         u_loss = []
 
-        for idx, net_i in enumerate(nets):
+        for idx, net_i in enumerate(nets_):
 
-            pred = nets[idx](img)
+            pred = nets_[idx](img)
             unlabled_loss = criterion(pred, pred2segmentation(distributions.to(device)))
             if method!='A':
                 optimizers[idx].zero_grad()
@@ -216,27 +217,23 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
         test(nets_, nets_path, test_data, method='A')
 
 
-def train_ensemble(nets_, labeled_loader_, unlabeled_loader_):
+def train_ensemble(nets_, labeled_loader_:DataLoader, unlabeled_loader_:DataLoader, method='A'):
     """
     train_ensemble function performs the ensemble training with the unlabeled subset.
     """
     for net_i in nets_:
         net_i.train()
 
-    labeled_loader_iter = enumerate(labeled_loader)
-    unlabeled_loader_iter = enumerate(unlabeled_loader)
-
+    global highest_jsd_dice_score
     nets_path = ['checkpoint/best_ENet_ensemble.pth',
                  'checkpoint/best_UNet_ensemble.pth',
                  'checkpoint/best_SegNet_ensemble.pth']
 
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    loss_ensemble_meter = AverageValueMeter()
-
-    for epoch in range(max_epoch):
-        print('epoch = {0:8d}/{1:8d}'.format(epoch, max_epoch))
-
+    loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()] # what is the purpose of this variable?
+    # loss_ensemble_meter = AverageValueMeter()
+    for epoch in range(max_epoch_ensemble):
+        print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
             loss_meters[idx].reset()
@@ -247,72 +244,57 @@ def train_ensemble(nets_, labeled_loader_, unlabeled_loader_):
                     print('learning rate:', param_group['lr'])
 
         # train with labeled data
-        try:
-            _, labeled_batch = labeled_loader_iter.__next__()
-        except:
-            labeled_loader_iter = enumerate(labeled_loader_)
-            _, labeled_batch = labeled_loader_iter.__next__()
+        labeled_batch = batch_iteration(labeled_loader_)
 
         img, mask, _ = labeled_batch
-        (img, mask) = (img.cuda(), mask.cuda()) if (torch.cuda.is_available() and use_cuda) else (img, mask)
+        img, mask = img.to(device), mask.to(device)
+        lloss_list = []
 
-        optiENet.zero_grad()
-        optiUNet.zero_grad()
-        optiSegNet.zero_grad()
+        for idx, net_i in enumerate(nets_):
 
-        pred_enet = nets_[0](img)
-        pred_unet = nets_[1](img)
-        pred_segnet = nets_[2](img)
-
-        loss_enet = criterion(pred_enet, mask.squeeze(1))
-        loss_unet = criterion(pred_unet, mask.squeeze(1))
-        loss_segnet = criterion(pred_segnet, mask.squeeze(1))
-
-        loss_enet.backward()
-        loss_unet.backward()
-        loss_segnet.backward()
-
-        optiENet.step()
-        optiUNet.step()
-        optiSegNet.step()
-
-        # computing loss
-        loss_ensemble_meter.add(loss_enet.item())
-        loss_ensemble_meter.add(loss_unet.item())
-        loss_ensemble_meter.add(loss_segnet.item())
+            optimizers[idx].zero_grad()
+            pred = nets_[idx](img)
+            labeled_loss = criterion(pred, mask.squeeze(1))
+            dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
+            dice_meters[idx].add(dice_score)
+            if method != 'A':
+                labeled_loss.backward()
+                optimizers[idx].step()
+            if method=='A':
+                lloss_list.append(labeled_loss)
 
         # train with unlabeled data
-        try:
-            _, unlabeled_batch = unlabeled_loader_iter.__next__()
-        except:
-            unlabeled_loader_iter = enumerate(unlabeled_loader_)
-            _, unlabeled_batch = unlabeled_loader_iter.__next__()
+        unlabeled_batch = batch_iteration(unlabeled_loader_)
 
         img, _, _ = unlabeled_batch
-        img = img.cuda() if (torch.cuda.is_available() and use_cuda) else img
+        img = img.to(device)
 
-        optimizers[0].zero_grad()  # ENet optimizer
-        optimizers[1].zero_grad()  # UNet optimizer
-        optimizers[2].zero_grad()  # SegNet optimizer
+        nets_probs = []
         # computing nets output
-        enet_prob = F.softmax(nets_[0](img), dim=1)  # ENet output
-        unet_prob = F.softmax(nets_[1](img), dim=1)  # UNet output
-        segnet_prob = F.softmax(nets_[1](img), dim=1)  # SegNet output
-        ensemble_probs = torch.cat([enet_prob, unet_prob, segnet_prob], 0)
+        for idx, net_i in enumerate(nets_):
+            nets_probs.append(F.softmax(nets_[idx](img)))
 
-        jsd_loss = ensemble_criterion(ensemble_probs)
-        jsd_loss.backward()
-        optimizers[0].step()
-        optimizers[1].step()
-        optimizers[2].step()
+        u_loss = []
+        for idx, net_i in enumerate(nets_):
+            ensemble_probs = torch.cat(nets_probs, 0)
+            unlabeled_loss = ensemble_criterion(ensemble_probs) # loss considering JSD
+            if method!='A':
+                unlabeled_loss.backward()
+                optimizers[idx].step()
+            elif method=='A':
+                u_loss.append(unlabeled_loss)
 
-        #board_loss.plot('train_loss_per_epoch SegNet', loss_ensemble_meter.value()[0])
+        if method =='A':
+            for idx in range(3):
+                optimizers[idx].zero_grad()
+                total_loss = lloss_list[idx] + u_loss[idx]
+                total_loss.backward()
+                optimizers[idx].step()
 
-        # testing segmentation nets
-        test(nets_, nets_path, test_loader)
+        test(nets_, nets_path, test_data, method='A')
 
 
-def test(nets_, nets_path_, test_loader_):
+def test(nets_, nets_path_, test_loader_, method='A'):
     """
     This function performs the evaluation with the test set containing labeled images.
     """
@@ -340,8 +322,6 @@ def test(nets_, nets_path_, test_loader_):
         distributions /= 3
         mv_dice_score = dice_loss(pred2segmentation(distributions.to(device)), mask.squeeze(1))
         mv_dice_score_meter.add(mv_dice_score.item())
-        # if i % val_print_frequncy == 0:
-        #     showImages(board_test_image, img, mask, pred2segmentation(distributions))
 
     for net_i in nets_:
         net_i.train()
@@ -366,7 +346,3 @@ def test(nets_, nets_path_, test_loader_):
 
 if __name__ == "__main__":
     pre_train()
-    # # nets_path = ['checkpoint/best_ENet_pre-trained.pth',
-    #              'checkpoint/best_UNet_pre-trained.pth',
-    #              'checkpoint/best_SegNet_pre-trained.pth']
-    # train_baseline(nets, nets_path, labeled_loader, unlabeled_loader)
