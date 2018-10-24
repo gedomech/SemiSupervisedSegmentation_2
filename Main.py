@@ -21,16 +21,17 @@ class_number = 2
 lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
-number_workers = 4
-batch_size = 4 # 1
-max_epoch_pre = 2 # 1
-max_epoch = 2 # 1
+device = torch.device("cuda" if use_cuda else "cpu")
+number_workers = 1
+batch_size = 1
+max_epoch_pre = 1
+max_epoch = 1
 train_print_frequncy = 10
 val_print_frequncy = 10
 ## visualization
-board_train_image = Dashboard(server='http://localhost', env="image_train")
-board_test_image = Dashboard(server='http://localhost', env="image_test")
-board_loss = Dashboard(server='http://localhost', env="loss")
+# board_train_image = Dashboard(server='http://localhost', env="image_train")
+# board_test_image = Dashboard(server='http://localhost', env="image_test")
+# board_loss = Dashboard(server='http://localhost', env="loss")
 
 Equalize = True
 ## data for semi-supervised training
@@ -118,8 +119,8 @@ def pre_train():
                 #
                 # dice_meters[idx].add(dice)
 
-                if i % train_print_frequncy == 0:
-                    showImages(board_train_image, img, mask, pred2segmentation(pred))
+                # if i % train_print_frequncy == 0:
+                #     showImages(board_train_image, img, mask, pred2segmentation(pred))
             # for idx, _ in enumerate(nets):
             #     if idx == 0:
             #         board_loss.plot('train_dice_per_epoch for ENet', dice_meters[idx].value()[0])
@@ -200,8 +201,8 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
             dice_meters[idx].add(dice_score)
 
-            if i % val_print_frequncy == 0:
-                showImages(board_train_image, img, mask, pred2segmentation(pred))
+            # if i % val_print_frequncy == 0:
+            #     showImages(board_train_image, img, mask, pred2segmentation(pred))
 
         # train with unlabeled data
         try:
@@ -216,18 +217,18 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
         for idx, net_i in enumerate(nets):
             pred = nets[idx](img)
-            distributions += F.softmax(pred, 1)
+            distributions += F.softmax(pred.cpu(), 1)
 
         distributions /= 3
 
         for idx, net_i in enumerate(nets):
             optimizers[idx].zero_grad()
             pred = nets[idx](img)
-            loss = criterion(pred2segmentation(pred), distributions.squeeze(1))
+            loss = criterion(pred.cuda(), pred2segmentation(distributions.cuda()))
             loss.backward()
             optimizers[idx].step()
 
-        mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
+        mv_dice_score = dice_loss(pred2segmentation(distributions.cuda()), mask.squeeze(1))
         if highest_mv_dice_score > mv_dice_score.item():
             highest_mv_dice_score = mv_dice_score.item()
             print('epoch = {0:8d}/{1:8d} the highest mv dice score is {2:.3f}.'.format(epoch, max_epoch, highest_mv_dice_score))
@@ -254,21 +255,17 @@ def test(nets_, nets_path_, test_loader_):
     for i, (img, mask, _) in tqdm(enumerate(test_loader_)):
         (img, mask) = (img.cuda(), mask.cuda()) if (torch.cuda.is_available() and use_cuda) else (img, mask)
         distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
-        #distributions.cuda()
         for idx, net_i in enumerate(nets):
             pred_test = nets[idx](img)
-            print(type(pred_test))
-            distributions += F.softmax(pred_test, 1).data.cpu()
-            print("pred2segmentation(pred_test)", type(pred2segmentation(pred_test)),
-                  "mask.squeeze(1)", type(mask.squeeze(1)))
-            dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
+            distributions += F.softmax(pred_test.cpu(), 1)
+            dice_test = dice_loss(pred_test, mask.squeeze(1))
             dice_meters_test[idx].add(dice_test)
 
         distributions /= 3
-        mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
+        mv_dice_score = dice_loss(pred2segmentation(distributions.cuda()), mask.squeeze(1))
         mv_dice_score_meter.add(mv_dice_score.item())
-        if i % val_print_frequncy == 0:
-            showImages(board_test_image, img, mask, pred2segmentation(distributions))
+        # if i % val_print_frequncy == 0:
+        #     showImages(board_test_image, img, mask, pred2segmentation(distributions))
 
     for net_i in nets_:
         net_i.train()
