@@ -25,7 +25,7 @@ use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 number_workers = 1
 batch_size = 1
-max_epoch_pre = 1
+max_epoch_pre = 100
 max_epoch = 10
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -101,6 +101,7 @@ def pre_train():
         print('epoch = {0:4d}/{1:4d} pre-training'.format(epoch, max_epoch_pre))
         for idx, _ in enumerate(nets):
             dice_meters[idx].reset()
+
 
         if epoch % 5 == 0:
             for opti_i in optimizers:
