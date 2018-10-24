@@ -15,7 +15,7 @@ from myutils.myUtils import pred2segmentation, iou_loss, showImages, dice_loss
 from myutils.myVisualize import Dashboard
 warnings.filterwarnings('ignore')
 
-torch.set_num_threads(1)  # set by deafault to 1
+torch.set_num_threads(3)  # set by deafault to 1
 root = "datasets/ISIC2018"
 
 class_number = 2
@@ -23,10 +23,10 @@ lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-number_workers = 1
+number_workers = 0
 batch_size = 1
-max_epoch_pre = 100
-max_epoch = 10
+max_epoch_pre = 0
+max_epoch_baseline = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
@@ -44,11 +44,11 @@ unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=T
 test_data = ISICdata(root=root, model='test', mode='semi', transform=True,
                      dataAugment=False, equalize=Equalize)
 
-labeled_loader = DataLoader(labeled_data, batch_size=batch_size, shuffle=True,
+labeled_data = DataLoader(labeled_data, batch_size=batch_size, shuffle=True,
                             num_workers=number_workers, pin_memory=True)
-unlabeled_loader = DataLoader(unlabeled_data, batch_size=batch_size, shuffle=False,
+unlabeled_data = DataLoader(unlabeled_data, batch_size=batch_size, shuffle=False,
                               num_workers=number_workers, pin_memory=True)
-test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False,
+test_data = DataLoader(test_data, batch_size=batch_size, shuffle=False,
                          num_workers=number_workers, pin_memory=True)
 
 ## networks and optimisers
@@ -81,6 +81,15 @@ highest_dice_unet = -1
 highest_dice_segnet = -1
 highest_mv_dice_score = -1
 
+def batch_iteration(dataloader:DataLoader)->tuple:
+    try:
+        _, labeled_batch = enumerate(dataloader).__next__()
+    except:
+        labeled_loader_iter = enumerate(dataloader)
+        _, labeled_batch = labeled_loader_iter.__next__()
+    return labeled_batch
+
+
 
 def pre_train():
     """
@@ -109,8 +118,8 @@ def pre_train():
                     param_group['lr'] = param_group['lr'] * (0.95)
                     print('learning rate:', param_group['lr'])
 
-        for i, (img, mask, _) in tqdm(enumerate(labeled_loader)):
-            (img, mask) = (img.to(device), mask.to(device)) if (torch.cuda.is_available() and use_cuda) else (img, mask)
+        for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
+            img, mask = img.to(device), mask.to(device)
 
             for idx, net_i in enumerate(nets):
                 optimizers[idx].zero_grad()
@@ -118,12 +127,12 @@ def pre_train():
                 loss = criterion(pred, mask.squeeze(1))
                 loss.backward()
                 optimizers[idx].step()
-        test(nets, nets_path, test_loader)
+        test(nets, nets_path, test_data)
 
-    train_baseline(nets, nets_path, labeled_loader, unlabeled_loader)
+    train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
 
-def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
+def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_loader_:DataLoader, method='A'):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
@@ -136,12 +145,11 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     nets_path = ['checkpoint/best_ENet_baseline.pth',
                  'checkpoint/best_UNet_baseline.pth',
                  'checkpoint/best_SegNet_baseline.pth']
-    labeled_loader_iter = enumerate(labeled_loader_)
-    unlabeled_loader_iter = enumerate(unlabeled_loader_)
+
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    for epoch in range(max_epoch):
-        print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch))
+    for epoch in range(max_epoch_baseline):
+        print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
             loss_meters[idx].reset()
@@ -152,32 +160,28 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                     print('learning rate:', param_group['lr'])
 
         # train with labeled data
-        try:
-            _, labeled_batch = labeled_loader_iter.__next__()
-        except:
-            labeled_loader_iter = enumerate(labeled_loader_)
-            _, labeled_batch = labeled_loader_iter.__next__()
+        labeled_batch = batch_iteration(labeled_loader_)
 
         img, mask, _ = labeled_batch
         img, mask = img.to(device), mask.to(device)
+        lloss_list= []
+
         for idx, net_i in enumerate(nets):
+
             optimizers[idx].zero_grad()
             pred = nets[idx](img)
-            loss_test = criterion(pred, mask.squeeze(1))
-            loss_test.backward()
-            optimizers[idx].step()
+            labeled_loss = criterion(pred, mask.squeeze(1))
             dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
             dice_meters[idx].add(dice_score)
+            if method != 'A':
+                labeled_loss.backward()
+                optimizers[idx].step()
+            if method=='A':
+                lloss_list.append(labeled_loss)
 
-            # if i % val_print_frequncy == 0:
-            #     showImages(board_train_image, img, mask, pred2segmentation(pred))
 
         # train with unlabeled data
-        try:
-            _, unlabeled_batch = unlabeled_loader_iter.__next__()
-        except:
-            unlabeled_loader_iter = enumerate(unlabeled_loader_)
-            _, unlabeled_batch = unlabeled_loader_iter.__next__()
+        unlabeled_batch = batch_iteration(unlabeled_loader_)
 
         img, _, _ = unlabeled_batch
         img = img.to(device)
@@ -188,15 +192,32 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             distributions += F.softmax(pred.cpu(), 1)
 
         distributions /= 3
+        u_loss = []
 
         for idx, net_i in enumerate(nets):
-            optimizers[idx].zero_grad()
-            pred = nets[idx](img)
-            loss = criterion(pred, pred2segmentation(distributions.to(device)))
-            loss.backward()
-            optimizers[idx].step()
 
-        test(nets_, nets_path, test_loader)
+            pred = nets[idx](img)
+            unlabled_loss = criterion(pred, pred2segmentation(distributions.to(device)))
+            if method!='A':
+                optimizers[idx].zero_grad()
+                unlabled_loss.backward()
+                optimizers[idx].step()
+            elif method=='A':
+                u_loss.append(unlabled_loss)
+
+        if method =='A':
+            for idx in range(3):
+                optimizers[idx].zero_grad()
+                total_loss = lloss_list[idx] + u_loss[idx]
+                total_loss.backward()
+                optimizers[idx].step()
+
+
+
+
+
+
+        test(nets_, nets_path, test_data, method='A')
 
 
 def test(nets_, nets_path_, test_loader_):
