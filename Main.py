@@ -95,7 +95,7 @@ def pre_train():
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     for epoch in range(max_epoch_pre):
-
+        print('epoch = {0:4d}/{1:4d} pre-training'.format(epoch, max_epoch_pre))
         for idx, _ in enumerate(nets):
             dice_meters[idx].reset()
 
