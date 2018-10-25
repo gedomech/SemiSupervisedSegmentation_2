@@ -26,11 +26,14 @@ use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 number_workers = 0
 batch_size = 1
-max_epoch_pre = 0
+max_epoch_pre = 100
 max_epoch_baseline = 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
+
+output_file = open("../output_file_10242018.txt", "w")
+# output_file.write("Woops! I have deleted the content!")
 
 ## visualization
 # board_train_image = Dashboard(server='http://localhost', env="image_train")
@@ -115,11 +118,11 @@ def pre_train():
             dice_meters[idx].reset()
 
         if epoch % 5 == 0:
-            print('\n')
+            output_file.write('\n')
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * (0.95)
-                    print('learning rate:', param_group['lr'])
+                    output_file.write('learning rate:', param_group['lr'])
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
@@ -134,7 +137,7 @@ def pre_train():
                 dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
                 dice_meters[idx].add(dice_score)
 
-        print('\nepoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
+        output_file.write('\nepoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
         unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
                                                                      max_epoch_pre,
                                                                      dice_meters[0].value()[0],
@@ -163,7 +166,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     for epoch in range(max_epoch_baseline):
-        print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
+        output_file.write('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
             loss_meters[idx].reset()
@@ -171,7 +174,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * 0.95
-                    print('learning rate:', param_group['lr'])
+                    output_file.write('learning rate:', param_group['lr'])
 
         # train with labeled data
         labeled_batch = batch_iteration(labeled_loader_)
@@ -193,7 +196,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
             if method == 'A':
                 lloss_list.append(labeled_loss)
 
-        print('\nepoch {0:4d}/{1:4d} baseline training with labeled data: enet_dice_score: {2:.3f},\
+        output_file.write('\nepoch {0:4d}/{1:4d} baseline training with labeled data: enet_dice_score: {2:.3f},\
         unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
                                                                      max_epoch_baseline,
                                                                      dice_meters[0].value()[0],
@@ -225,12 +228,12 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
             elif method == 'A':
                 u_loss.append(unlabled_loss)
 
-            # print("Type pred", type(pred), "shape pred", pred.shape)
-            # print("Type pred2segmentation(pred)", type(pred2segmentation(pred)),
+            # output_file.write("Type pred", type(pred), "shape pred", pred.shape)
+            # output_file.write("Type pred2segmentation(pred)", type(pred2segmentation(pred)),
             #      "shape pred2segmentation(pred)", pred2segmentation(pred).shape)
-            # print("Type distributions", type(distributions),
+            # output_file.write("Type distributions", type(distributions),
             #      "shape distributions", distributions.shape)
-            # print("Type pred2segmentation(distributions)", type(pred2segmentation(distributions)),
+            # output_file.write("Type pred2segmentation(distributions)", type(pred2segmentation(distributions)),
             #      "shape pred2segmentation(distributions)", pred2segmentation(distributions).shape)
             # dice_score = dice_loss(pred2segmentation(pred), pred2segmentation(distributions.to(device)))
             # dice_meters[idx].add(dice_score)
@@ -242,7 +245,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
                 total_loss.backward()
                 optimizers[idx].step()
 
-        # print('\nepoch {0:4d}/{1:4d} baseline training: enet_dice_score: {2:.3f},\
+        # output_file.write('\nepoch {0:4d}/{1:4d} baseline training: enet_dice_score: {2:.3f},\
         # unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch+1,
         #                                                                   max_epoch_baseline,
         #                                                                   dice_meters[0].value()[0],
@@ -269,7 +272,7 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
                    AverageValueMeter()]  # what is the purpose of this variable?
     # loss_ensemble_meter = AverageValueMeter()
     for epoch in range(max_epoch_ensemble):
-        print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
+        output_file.write('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
             loss_meters[idx].reset()
@@ -277,7 +280,7 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * (0.95 ** (epoch // 10))
-                    print('learning rate:', param_group['lr'])
+                    output_file.write('learning rate:', param_group['lr'])
 
         # train with labeled data
         labeled_batch = batch_iteration(labeled_loader_)
@@ -299,7 +302,7 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
             if method == 'A':
                 lloss_list.append(labeled_loss)
 
-        print('\nepoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f},\
+        output_file.write('\nepoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f},\
         unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
                                                                      max_epoch_baseline,
                                                                      dice_meters[0].value()[0],
@@ -337,7 +340,7 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
                 total_loss.backward(retain_graph=True)
                 optimizers[idx].step()
 
-        # print('\nepoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f},\
+        # output_file.write('\nepoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f},\
         # unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch+1,
         #                                                                   max_epoch_baseline,
         #                                                                   dice_meters[0].value()[0],
@@ -382,17 +385,17 @@ def test(nets_, nets_path_, test_loader_, method='A'):
 
         if (idx == 0) and (highest_dice_enet < mv_dice_score_meter.value()[0]):
             highest_dice_enet = mv_dice_score_meter.value()[0]
-            print('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
+            output_file.write('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 1) and (highest_dice_unet < mv_dice_score_meter.value()[0]):
             highest_dice_unet = mv_dice_score_meter.value()[0]
-            print('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
+            output_file.write('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 2) and (highest_dice_segnet < mv_dice_score_meter.value()[0]):
             highest_dice_segnet = mv_dice_score_meter.value()[0]
-            print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
+            output_file.write('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
 
