@@ -122,7 +122,7 @@ def pre_train():
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * (0.95)
-                    output_file.write('learning rate:', param_group['lr'])
+                    output_file.write('learning rate: ' + str(param_group['lr']))
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
@@ -174,7 +174,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * 0.95
-                    output_file.write('learning rate:', param_group['lr'])
+                    output_file.write('learning rate:' + str(param_group['lr']))
 
         # train with labeled data
         labeled_batch = batch_iteration(labeled_loader_)
@@ -280,7 +280,7 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * (0.95 ** (epoch // 10))
-                    output_file.write('learning rate:', param_group['lr'])
+                    output_file.write('learning rate:' + str(param_group['lr']))
 
         # train with labeled data
         labeled_batch = batch_iteration(labeled_loader_)
