@@ -84,6 +84,7 @@ highest_dice_segnet = -1
 highest_mv_dice_score = -1
 highest_jsd_dice_score = -1
 
+
 def batch_iteration(dataloader:DataLoader)->tuple:
     try:
         _, labeled_batch = enumerate(dataloader).__next__()
@@ -91,7 +92,6 @@ def batch_iteration(dataloader:DataLoader)->tuple:
         labeled_loader_iter = enumerate(dataloader)
         _, labeled_batch = labeled_loader_iter.__next__()
     return labeled_batch
-
 
 
 def pre_train():
@@ -110,12 +110,12 @@ def pre_train():
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     for epoch in range(max_epoch_pre):
-        print('epoch = {0:4d}/{1:4d} pre-training'.format(epoch, max_epoch_pre))
+
         for idx, _ in enumerate(nets):
             dice_meters[idx].reset()
 
-
         if epoch % 5 == 0:
+            print('\n')
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * (0.95)
@@ -130,12 +130,23 @@ def pre_train():
                 loss = criterion(pred, mask.squeeze(1))
                 loss.backward()
                 optimizers[idx].step()
+
+                dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
+                dice_meters[idx].add(dice_score)
+
+        print('\nepoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
+        unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
+                                                                     max_epoch_pre,
+                                                                     dice_meters[0].value()[0],
+                                                                     dice_meters[1].value()[0],
+                                                                     dice_meters[2].value()[0], ))
+
         test(nets, nets_path, test_data)
 
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
 
-def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_loader_:DataLoader, method='A'):
+def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loader_: DataLoader, method='A'):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
@@ -167,7 +178,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
 
         img, mask, _ = labeled_batch
         img, mask = img.to(device), mask.to(device)
-        lloss_list= []
+        lloss_list = []
 
         for idx, net_i in enumerate(nets_):
 
@@ -179,8 +190,15 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
             if method != 'A':
                 labeled_loss.backward()
                 optimizers[idx].step()
-            if method=='A':
+            if method == 'A':
                 lloss_list.append(labeled_loss)
+
+        print('\nepoch {0:4d}/{1:4d} baseline training with labeled data: enet_dice_score: {2:.3f},\
+        unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
+                                                                     max_epoch_baseline,
+                                                                     dice_meters[0].value()[0],
+                                                                     dice_meters[1].value()[0],
+                                                                     dice_meters[2].value()[0], ))
 
         # train with unlabeled data
         unlabeled_batch = batch_iteration(unlabeled_loader_)
@@ -200,24 +218,41 @@ def train_baseline(nets_, nets_path_, labeled_loader_:DataLoader, unlabeled_load
 
             pred = nets_[idx](img)
             unlabled_loss = criterion(pred, pred2segmentation(distributions.to(device)))
-            if method!='A':
+            if method != 'A':
                 optimizers[idx].zero_grad()
                 unlabled_loss.backward()
                 optimizers[idx].step()
-            elif method=='A':
+            elif method == 'A':
                 u_loss.append(unlabled_loss)
 
-        if method =='A':
+            # print("Type pred", type(pred), "shape pred", pred.shape)
+            # print("Type pred2segmentation(pred)", type(pred2segmentation(pred)),
+            #      "shape pred2segmentation(pred)", pred2segmentation(pred).shape)
+            # print("Type distributions", type(distributions),
+            #      "shape distributions", distributions.shape)
+            # print("Type pred2segmentation(distributions)", type(pred2segmentation(distributions)),
+            #      "shape pred2segmentation(distributions)", pred2segmentation(distributions).shape)
+            # dice_score = dice_loss(pred2segmentation(pred), pred2segmentation(distributions.to(device)))
+            # dice_meters[idx].add(dice_score)
+
+        if method == 'A':
             for idx in range(3):
                 optimizers[idx].zero_grad()
                 total_loss = lloss_list[idx] + u_loss[idx]
                 total_loss.backward()
                 optimizers[idx].step()
 
+        # print('\nepoch {0:4d}/{1:4d} baseline training: enet_dice_score: {2:.3f},\
+        # unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch+1,
+        #                                                                   max_epoch_baseline,
+        #                                                                   dice_meters[0].value()[0],
+        #                                                                   dice_meters[1].value()[0],
+        #                                                                   dice_meters[2].value()[0],))
         test(nets_, nets_path, test_data, method='A')
+    train_ensemble(nets, labeled_data, unlabeled_data)
 
 
-def train_ensemble(nets_, labeled_loader_:DataLoader, unlabeled_loader_:DataLoader, method='A'):
+def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLoader, method='A'):
     """
     train_ensemble function performs the ensemble training with the unlabeled subset.
     """
@@ -230,7 +265,8 @@ def train_ensemble(nets_, labeled_loader_:DataLoader, unlabeled_loader_:DataLoad
                  'checkpoint/best_SegNet_ensemble.pth']
 
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()] # what is the purpose of this variable?
+    loss_meters = [AverageValueMeter(), AverageValueMeter(),
+                   AverageValueMeter()]  # what is the purpose of this variable?
     # loss_ensemble_meter = AverageValueMeter()
     for epoch in range(max_epoch_ensemble):
         print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
@@ -260,8 +296,15 @@ def train_ensemble(nets_, labeled_loader_:DataLoader, unlabeled_loader_:DataLoad
             if method != 'A':
                 labeled_loss.backward()
                 optimizers[idx].step()
-            if method=='A':
+            if method == 'A':
                 lloss_list.append(labeled_loss)
+
+        print('\nepoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f},\
+        unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
+                                                                     max_epoch_baseline,
+                                                                     dice_meters[0].value()[0],
+                                                                     dice_meters[1].value()[0],
+                                                                     dice_meters[2].value()[0], ))
 
         # train with unlabeled data
         unlabeled_batch = batch_iteration(unlabeled_loader_)
@@ -277,21 +320,30 @@ def train_ensemble(nets_, labeled_loader_:DataLoader, unlabeled_loader_:DataLoad
         u_loss = []
         for idx, net_i in enumerate(nets_):
             ensemble_probs = torch.cat(nets_probs, 0)
-            unlabeled_loss = ensemble_criterion(ensemble_probs) # loss considering JSD
-            if method!='A':
+            unlabeled_loss = ensemble_criterion(ensemble_probs)  # loss considering JSD
+            if method != 'A':
                 unlabeled_loss.backward()
                 optimizers[idx].step()
-            elif method=='A':
+            elif method == 'A':
                 u_loss.append(unlabeled_loss)
 
-        if method =='A':
+            # dice_score = dice_loss(pred2segmentation(pred), pred2segmentation(distributions.to(device)))
+            # dice_meters[idx].add(dice_score)
+
+        if method == 'A':
             for idx in range(3):
                 optimizers[idx].zero_grad()
                 total_loss = lloss_list[idx] + u_loss[idx]
-                total_loss.backward()
+                total_loss.backward(retain_graph=True)
                 optimizers[idx].step()
 
-        test(nets_, nets_path, test_data, method='A')
+        # print('\nepoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f},\
+        # unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch+1,
+        #                                                                   max_epoch_baseline,
+        #                                                                   dice_meters[0].value()[0],
+        #                                                                   dice_meters[1].value()[0],
+        #                                                                   dice_meters[2].value()[0],))
+        test(nets_, nets_path, test_data)
 
 
 def test(nets_, nets_path_, test_loader_, method='A'):
@@ -315,7 +367,7 @@ def test(nets_, nets_path_, test_loader_, method='A'):
         distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
         for idx, net_i in enumerate(nets):
             pred_test = nets[idx](img)
-            distributions += F.softmax(pred_test, 1)
+            distributions += F.softmax(pred_test.cpu(), 1)
             dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
             dice_meters_test[idx].add(dice_test)
 
@@ -330,17 +382,17 @@ def test(nets_, nets_path_, test_loader_, method='A'):
 
         if (idx == 0) and (highest_dice_enet < mv_dice_score_meter.value()[0]):
             highest_dice_enet = mv_dice_score_meter.value()[0]
-            print('The highest dice for ENet is {:.3f}'.format(highest_dice_enet))
+            print('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 1) and (highest_dice_unet < mv_dice_score_meter.value()[0]):
             highest_dice_unet = mv_dice_score_meter.value()[0]
-            print('The highest dice for UNet is {:.3f}'.format(highest_dice_unet))
+            print('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 2) and (highest_dice_segnet < mv_dice_score_meter.value()[0]):
             highest_dice_segnet = mv_dice_score_meter.value()[0]
-            print('The highest dice for SegNet is {:.3f}'.format(highest_dice_segnet))
+            print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
 
