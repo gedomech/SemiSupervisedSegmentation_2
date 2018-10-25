@@ -26,9 +26,9 @@ use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 number_workers = 0
 batch_size = 1
-max_epoch_pre = 2 #100
-max_epoch_baseline = 2 #100
-max_epoch_ensemble = 2 # 100
+max_epoch_pre = 100
+max_epoch_baseline = 100
+max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
