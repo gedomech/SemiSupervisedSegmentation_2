@@ -32,8 +32,8 @@ max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
-global output_file
-output_file = open("../output_file_10242018.txt", "w")
+#global output_file
+#output_file = open("../output_file_10242018.txt", "w")
 
 ## visualization
 # board_train_image = Dashboard(server='http://localhost', env="image_train")
