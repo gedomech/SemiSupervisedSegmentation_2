@@ -136,12 +136,9 @@ def pre_train():
                 dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
                 dice_meters[idx].add(dice_score)
 
- `      print('\nepoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
-        unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
-                                                                     max_epoch_pre,
-                                                                     dice_meters[0].value()[0],
-                                                                     dice_meters[1].value()[0],
-                                                                     dice_meters[2].value()[0], ))
+            print('\nepoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
+             unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+                                                              dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
         test(nets, nets_path, test_data)
 
