@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import numpy as np,pandas as pd, matplotlib.pyplot as plt
-from PIL import Image
+from torch.utils.data import DataLoader
 
 def colormap(n):
     cmap=np.zeros([n, 3]).astype(np.uint8)
@@ -50,7 +50,7 @@ def iou_loss(pred, target, n_class):
     return ious
 
 
-def image_batch_generator(dataloader_=None, device_=device):
+def image_batch_generator(dataloader_=None, device_=torch.device):
     """
     This function generates batches containing (images, masks, paths)
     :param dataloader_: Dataloader object to manage the data loading.
