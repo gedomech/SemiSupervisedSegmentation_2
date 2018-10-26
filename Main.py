@@ -1,6 +1,6 @@
 import os
 import sys
-
+from tensorboardX import SummaryWriter
 sys.path.extend([os.path.dirname(os.getcwd())])
 import torch
 from torch.utils.data import DataLoader
@@ -13,19 +13,22 @@ import warnings
 from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
 from myutils.myUtils import pred2segmentation, dice_loss
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
+writer = SummaryWriter()
 
-torch.set_num_threads(3)  # set by deafault to 1
-root = "datasets/ISIC2018"
+# torch.set_num_threads(3)  # set by deafault to 1
+root = "dataset"
 
 class_number = 2
 lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-number_workers = 0
-batch_size = 1
+number_workers = 8
+batch_size = 8
+val_batch_size=1
 max_epoch_pre = 100
 max_epoch_baseline = 100
 max_epoch_ensemble = 100
@@ -52,7 +55,7 @@ labeled_data = DataLoader(labeled_data, batch_size=batch_size, shuffle=True,
                             num_workers=number_workers, pin_memory=True)
 unlabeled_data = DataLoader(unlabeled_data, batch_size=batch_size, shuffle=False,
                               num_workers=number_workers, pin_memory=True)
-test_data = DataLoader(test_data, batch_size=batch_size, shuffle=False,
+test_data = DataLoader(test_data, batch_size=val_batch_size, shuffle=False,
                          num_workers=number_workers, pin_memory=True)
 
 ## networks and optimisers
@@ -121,7 +124,6 @@ def pre_train():
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * (0.95)
-                    print('learning rate:', param_group['lr'])
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
@@ -135,12 +137,23 @@ def pre_train():
 
                 dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
                 dice_meters[idx].add(dice_score)
+                if i==1:
+                    writer.add_image(str(idx),pred2segmentation(pred[0]).cpu().squeeze().numpy(),epoch)
 
-            print('epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
-             unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-                                                              dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
-        test(nets, nets_path, test_data)
+
+        print('traing epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
+         unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+                                                          dice_meters[1].value()[0], dice_meters[2].value()[0]))
+
+        val_subset_score,ensemble_score=test(nets, nets_path, test_data)
+
+        print('val epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
+         unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(epoch + 1, max_epoch_pre, val_subset_score[0],
+                                                          val_subset_score[1], val_subset_score[2],ensemble_score))
+
+        save(nets, val_subset_score,epoch)
+
 
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
@@ -160,12 +173,13 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
                  'checkpoint/best_SegNet_baseline.pth']
 
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
-            loss_meters[idx].reset()
+
+
         if epoch % 5 == 0:
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
@@ -192,11 +206,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
             if method == 'A':
                 lloss_list.append(labeled_loss)
 
-        print('epoch {0:4d}/{1:4d} baseline training with labeled data: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
-                                                                                                                                                               max_epoch_baseline,
-                                                                                                                                                               dice_meters[0].value()[0],
-                                                                                                                                                               dice_meters[1].value()[0],
-                                                                                                                                                               dice_meters[2].value()[0]))
 
         # train with unlabeled data
         unlabeled_batch = batch_iteration(unlabeled_loader_)
@@ -343,7 +352,7 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
         test(nets_, nets_path, test_data)
 
 
-def test(nets_, nets_path_, test_loader_, method='A'):
+def test(nets_, nets_path_, test_loader_):
     """
     This function performs the evaluation with the test set containing labeled images.
     """
@@ -359,38 +368,46 @@ def test(nets_, nets_path_, test_loader_, method='A'):
 
     for idx, _ in enumerate(nets_):
         dice_meters_test[idx].reset()
-    for i, (img, mask, _) in tqdm(enumerate(test_loader_)):
-        (img, mask) = img.to(device), mask.to(device)
-        distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
-        for idx, net_i in enumerate(nets):
-            pred_test = nets[idx](img)
-            distributions += F.softmax(pred_test.cpu(), 1)
-            dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
-            dice_meters_test[idx].add(dice_test)
 
-        distributions /= 3
-        mv_dice_score = dice_loss(pred2segmentation(distributions.to(device)), mask.squeeze(1))
-        mv_dice_score_meter.add(mv_dice_score.item())
+    with torch.no_grad():
+        for i, (img, mask, _) in tqdm(enumerate(test_loader_)):
+            (img, mask) = img.to(device), mask.to(device)
+            distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]]).to(device)
+
+            for idx, net_i in enumerate(nets_):
+                pred_test = nets[idx](img)
+                plt.imshow(pred_test[0, 1].cpu().numpy())
+
+                distributions += F.softmax(pred_test, 1)
+                # predicts.append( F.softmax(pred_test, 1))
+                dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
+                # dices.append(dice_test)
+                dice_meters_test[idx].add(dice_test)
+
+            distributions /= 3
+            mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
+            mv_dice_score_meter.add(mv_dice_score.item())
 
     for net_i in nets_:
         net_i.train()
 
-    for idx, net_i in enumerate(nets_):
-
-        if (idx == 0) and (highest_dice_enet < mv_dice_score_meter.value()[0]):
-            highest_dice_enet = mv_dice_score_meter.value()[0]
-            print('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
-            torch.save(net_i.state_dict(), nets_path_[idx])
-
-        elif (idx == 1) and (highest_dice_unet < mv_dice_score_meter.value()[0]):
-            highest_dice_unet = mv_dice_score_meter.value()[0]
-            print('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
-            torch.save(net_i.state_dict(), nets_path_[idx])
-
-        elif (idx == 2) and (highest_dice_segnet < mv_dice_score_meter.value()[0]):
-            highest_dice_segnet = mv_dice_score_meter.value()[0]
-            print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
-            torch.save(net_i.state_dict(), nets_path_[idx])
+    # for idx, net_i in enumerate(nets_):
+    #
+    #     if (idx == 0) and (highest_dice_enet < dice_meters_test[idx].value()[0]):
+    #         highest_dice_enet = mv_dice_score_meter.value()[0]
+    #         # print('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
+    #         torch.save(net_i.state_dict(), nets_path_[idx])
+    #
+    #     elif (idx == 1) and (highest_dice_unet <  dice_meters_test[idx].value()[0]):
+    #         highest_dice_unet = mv_dice_score_meter.value()[0]
+    #         # print('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
+    #         torch.save(net_i.state_dict(), nets_path_[idx])
+    #
+    #     elif (idx == 2) and (highest_dice_segnet <  dice_meters_test[idx].value()[0]):
+    #         highest_dice_segnet = mv_dice_score_meter.value()[0]
+    #         # print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
+    #         torch.save(net_i.state_dict(), nets_path_[idx])
+    return [dice_meters_test[idx].value()[0] for idx in range(3)], mv_dice_score_meter.value()[0]
 
 
 if __name__ == "__main__":
