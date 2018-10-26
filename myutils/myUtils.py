@@ -50,6 +50,23 @@ def iou_loss(pred, target, n_class):
     return ious
 
 
+def image_batch_generator(dataloader_=None, device_=device):
+    """
+    This function generates batches containing (images, masks, paths)
+    :param dataloader_: Dataloader object to manage the data loading.
+    :param device_: torch.device object where images and masks will be located.
+    :return: (images, masks, paths)
+    """
+    if not isinstance(dataloader_, DataLoader):
+        raise TypeError("Input must be a Dataloader Object")
+
+    try:
+        _, data_batch = enumerate(dataloader_).__next__()
+    except:
+        labeled_loader_iter = enumerate(dataloader_)
+        _, data_batch = labeled_loader_iter.__next__()
+    img, mask, paths = data_batch
+    return img.to(device_), mask.to(device_), paths
 
 
 class Colorize:
