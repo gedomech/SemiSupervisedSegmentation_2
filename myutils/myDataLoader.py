@@ -54,11 +54,11 @@ class ISICdata(Dataset):
         elif self.mode=="semi":
             assert model in ('labeled', 'unlabeled', 'test'), "the model should be always in 'labeled', 'unlabeled' or 'test', given '%s'." % model
             if self.model=="labeled":
-                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'labeled_tr.csv'))
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_labeled_tr.csv'))
             elif self.model=="unlabeled":
-                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'unlabeled_tr.csv'))
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_unlabeled_tr.csv'))
             elif self.model == "test":
-                img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'test.csv'))
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'random_test.csv'))
 
         self.imgs = img_gts_list['img'].values
         self.gts = img_gts_list['label'].values
