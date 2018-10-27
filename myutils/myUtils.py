@@ -74,6 +74,17 @@ def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device=t
     return img.to(device), mask.to(device), paths
 
 
+def save_models(nets, score=None, epoch=0):
+    """
+
+    :param nets:
+    :param score:
+    :param epoch:
+    :return:
+    """
+    pass
+
+
 class Colorize:
 
     def __init__(self, n=4):
