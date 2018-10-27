@@ -1,7 +1,11 @@
+import torch
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import numpy as np,pandas as pd, matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+
+from myutils.myLoss import JensenShannonDivergence
+
 
 def colormap(n):
     cmap=np.zeros([n, 3]).astype(np.uint8)
@@ -72,7 +76,7 @@ def image_batch_generator(dataset=None, device=torch.device):
     return img.to(device), mask.to(device), paths
 
 
-def save_models(nets_, nets_path_, score_meters=None, epoch=0,history_score_dict=None):
+def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dict=None, ):
     """
     This function saves the parameters of the nets
     :param nets_: networks containing the parameters to be saved
@@ -226,7 +230,8 @@ def cotraining(prediction, pseudolabel,nets,criterion):
     return loss
 
 
-
-
-
-
+def get_loss(predictions):
+    p = torch.cat(predictions)
+    criteron = JensenShannonDivergence()
+    loss = criteron(p)
+    return loss

@@ -1,11 +1,11 @@
-from PIL import Image, ImageEnhance,ImageOps,ImageFilter
-import numpy as np
+import os
 import random
-import os,matplotlib.pyplot as plt
-import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import utils,transforms
+
+import numpy as np
 import pandas as pd
+from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+from torch.utils.data import Dataset
+from torchvision import transforms
 
 num_class = 2
 spit_ratio = 0.9
@@ -128,7 +128,7 @@ class ISICdata(Dataset):
         return img, mask
 
     def __len__(self):
-        return int(len(self.imgs))
+        return int(len(self.imgs) / 50)
 
 
 

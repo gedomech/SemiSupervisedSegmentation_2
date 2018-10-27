@@ -1,20 +1,16 @@
 import os
 import sys
+
 from tensorboardX import SummaryWriter
 
 sys.path.extend([os.path.dirname(os.getcwd())])
-import torch
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
 from myutils.myDataLoader import ISICdata
 from myutils.myENet import Enet
 from myutils.myNetworks import UNet, SegNet
-from myutils.myLoss import CrossEntropyLoss2d, JensenShannonDivergence
+from myutils.myLoss import CrossEntropyLoss2d
 import warnings
 from tqdm import tqdm
-from torchnet.meter import AverageValueMeter
 from myutils.myUtils import *
-import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 writer = SummaryWriter()
@@ -132,7 +128,8 @@ def pre_train():
                 ensemble_score.value()[0]))
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch,historical_score_dict)
 
-    train_baseline(nets, nets_path, labeled_data, unlabeled_data, )
+    # train_baseline(nets, nets_path, labeled_data, unlabeled_data, )
+    train_ensemble(nets, nets_path, labeled_data, unlabeled_data, )
 
 
 def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
@@ -141,23 +138,19 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     """
     # loading pre-trained models
     map_(lambda x,y: [x.load_state_dict(torch.load(y)),x.train()],nets_,nets_path_)
-    global highest_mv_dice_score
+    global historical_score_dict
     nets_path = ['checkpoint/best_ENet_baseline.pth',
                  'checkpoint/best_UNet_baseline.pth',
                  'checkpoint/best_SegNet_baseline.pth']
 
-    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
-        for idx in range(len(nets_)):
-            dice_meters[idx].reset()
 
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
         # train with labeled data
-        for j in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
+        for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
 
             imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
@@ -174,103 +167,53 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 optimizers[idx].step()
 
         score_meters, ensemble_score = test(nets,  test_data, device=device)
+        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+        if ensemble_score.value()[0] > historical_score_dict['mv']:
+            historical_score_dict['mv'] = ensemble_score.value()[0]
 
 
-
-
-def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLoader, method='A'):
+def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     """
     train_ensemble function performs the ensemble training with the unlabeled subset.
     """
-    # for net_i in nets_:
-    #     net_i.train()
-    _ = [net_i.train() for net_i in nets]
 
     global highest_jsd_dice_score
+    map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
+
     nets_path = ['checkpoint/best_ENet_ensemble.pth',
                  'checkpoint/best_UNet_ensemble.pth',
                  'checkpoint/best_SegNet_ensemble.pth']
 
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-    # loss_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]  # what is the purpose of this variable?
-    # loss_ensemble_meter = AverageValueMeter()
+
     for epoch in range(max_epoch_ensemble):
         print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
-            # loss_meters[idx].reset()
+
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
-        # === train with labeled data ===
-        labeled_batch = image_batch_generator(labeled_loader_)
+        for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
+            # === train with labeled data ===
+            imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
+            _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
 
-        img, mask, _ = labeled_batch
-        img, mask = img.to(device), mask.to(device)
-        lloss_list = []
+            # train with unlabeled data
+            imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
+            pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
+            jsdLoss = get_loss(predictions)
 
-        for idx, net_i in enumerate(nets_):
+            total_loss = [x + jsdLoss for x in llost_list]
+            for idx, optim in enumerate(optimizers):
+                optim.zero_grad()
+                total_loss[idx].backward(retain_graph=True)
+                optim.step()
 
-            optimizers[idx].zero_grad()
-            pred = nets_[idx](img)
-            labeled_loss = criterion(pred, mask.squeeze(1))
-            dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
-            dice_meters[idx].add(dice_score)
-            if method != 'A':
-                labeled_loss.backward()
-                optimizers[idx].step()
-            if method == 'A':
-                lloss_list.append(labeled_loss)
 
-        print(
-            'epoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
-                epoch + 1,
-                max_epoch_baseline,
-                dice_meters[0].value()[0],
-                dice_meters[1].value()[0],
-                dice_meters[2].value()[0]))
-
-        # train with unlabeled data
-        # unlabeled_batch = batch_iteration(unlabeled_loader_)
-        img, _, _ = image_batch_generator(unlabeled_loader_, batch_size=batch_size,
-                                          number_workers=number_workers, device_=device)
-
-        # img, _, _ = unlabeled_batch
-        # img = img.to(device)
-
-        nets_probs = []
-        # computing nets output
-        for idx, net_i in enumerate(nets_):
-            nets_probs.append(F.softmax(nets_[idx](img)))
-
-        u_loss = []
-        for idx, net_i in enumerate(nets_):
-            ensemble_probs = torch.cat(nets_probs, 0)
-            unlabeled_loss = ensemble_criterion(ensemble_probs)  # loss considering JSD
-            if method != 'A':
-                unlabeled_loss.backward()
-                optimizers[idx].step()
-            elif method == 'A':
-                u_loss.append(unlabeled_loss)
-
-            # dice_score = dice_loss(pred2segmentation(pred), pred2segmentation(distributions.to(device)))
-            # dice_meters[idx].add(dice_score)
-
-        if method == 'A':
-            for idx in range(len(nets_)):
-                optimizers[idx].zero_grad()
-                total_loss = lloss_list[idx] + u_loss[idx]
-                total_loss.backward(retain_graph=True)
-                optimizers[idx].step()
-
-        # print('epoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f},\
-        # unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch+1,
-        #                                                                   max_epoch_baseline,
-        #                                                                   dice_meters[0].value()[0],
-        #                                                                   dice_meters[1].value()[0],
-        #                                                                   dice_meters[2].value()[0],))
         test(nets_, nets_path, test_data)
 
 
 if __name__ == "__main__":
     pre_train()
+    # train_ensemble()
