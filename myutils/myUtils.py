@@ -143,6 +143,7 @@ def showImages(board,image_batch, mask_batch,segment_batch):
     board.image(color_transform(mask_batch[0]), 'ground truth image')
     board.image(color_transform(segment_batch[0]), 'prediction given by the net')
 
+
 def learning_rate_decay(optims, factor=0.95):
     for opti_i in optims:
         for param_group in opti_i.param_groups:
