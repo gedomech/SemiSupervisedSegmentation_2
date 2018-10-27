@@ -73,11 +73,11 @@ criterion = CrossEntropyLoss2d(class_weigth).to(device) if (
     class_weigth)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 
-historical_score_dict={'enet':0,
-                       'unet':0,
-                       'segnet':0,
-                       'mv':0,
-                       'jsd':0}
+historical_score_dict = {'enet': 0,
+                         'unet': 0,
+                         'segnet': 0,
+                         'mv': 0,
+                         'jsd': 0}
 
 
 def pre_train():
@@ -116,7 +116,7 @@ def pre_train():
                 epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
                 dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
-        score_meters, ensemble_score = test(nets, test_data,device=device)
+        score_meters, ensemble_score = test(nets, test_data, device=device)
 
         print(
             'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(
@@ -126,7 +126,7 @@ def pre_train():
                 score_meters[1].value()[0],
                 score_meters[2].value()[0],
                 ensemble_score.value()[0]))
-        historical_score_dict = save_models(nets, nets_path, score_meters, epoch,historical_score_dict)
+        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
 
     # train_baseline(nets, nets_path, labeled_data, unlabeled_data, )
     train_ensemble(nets, nets_path, labeled_data, unlabeled_data, )
@@ -137,7 +137,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
     # loading pre-trained models
-    map_(lambda x,y: [x.load_state_dict(torch.load(y)),x.train()],nets_,nets_path_)
+    map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
     global historical_score_dict
     nets_path = ['checkpoint/best_ENet_baseline.pth',
                  'checkpoint/best_UNet_baseline.pth',
@@ -157,16 +157,16 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 
             # train with unlabeled data
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
-            pseudolabel, predictions = get_mv_based_labels (imgs,nets_)
-            ulost_list = cotraining(predictions,pseudolabel,nets_,criterion)
-            total_loss = [x+y for x,y in zip(llost_list,ulost_list)]
+            pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
+            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion)
+            total_loss = [x + y for x, y in zip(llost_list, ulost_list)]
 
             for idx in range(len(optimizers)):
                 optimizers[idx].zero_grad()
                 total_loss[idx].backward()
                 optimizers[idx].step()
 
-        score_meters, ensemble_score = test(nets,  test_data, device=device)
+        score_meters, ensemble_score = test(nets, test_data, device=device)
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
@@ -177,7 +177,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     train_ensemble function performs the ensemble training with the unlabeled subset.
     """
 
-    global highest_jsd_dice_score
+    global historical_score_dict
     map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
 
     nets_path = ['checkpoint/best_ENet_ensemble.pth',
@@ -210,8 +210,10 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 total_loss[idx].backward(retain_graph=True)
                 optim.step()
 
-
-        test(nets_, nets_path, test_data)
+        score_meters, ensemble_score = test(nets, test_data, device=device)
+        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+        if ensemble_score.value()[0] > historical_score_dict['jsd']:
+            historical_score_dict['jsd'] = ensemble_score.value()[0]
 
 
 if __name__ == "__main__":
