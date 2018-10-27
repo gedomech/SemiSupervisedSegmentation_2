@@ -50,12 +50,12 @@ unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=T
 test_data = ISICdata(root=root, model='test', mode='semi', transform=True,
                      dataAugment=False, equalize=Equalize)
 
-labeled_data = DataLoader(labeled_data, batch_size=batch_size, shuffle=True,
-                          num_workers=number_workers, pin_memory=True)
-unlabeled_data = DataLoader(unlabeled_data, batch_size=batch_size, shuffle=False,
-                            num_workers=number_workers, pin_memory=True)
-test_data = DataLoader(test_data, batch_size=val_batch_size, shuffle=False,
-                       num_workers=number_workers, pin_memory=True)
+# labeled_data = DataLoader(labeled_data, batch_size=batch_size, shuffle=True,
+#                           num_workers=number_workers, pin_memory=True)
+# unlabeled_data = DataLoader(unlabeled_data, batch_size=batch_size, shuffle=False,
+#                             num_workers=number_workers, pin_memory=True)
+# test_data = DataLoader(test_data, batch_size=val_batch_size, shuffle=False,
+#                        num_workers=number_workers, pin_memory=True)
 
 ## networks and optimisers
 nets = [Enet(class_number),
