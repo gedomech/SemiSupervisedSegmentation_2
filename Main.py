@@ -143,6 +143,7 @@ def pre_train():
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
 
+
 def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loader_: DataLoader, method='A'):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
