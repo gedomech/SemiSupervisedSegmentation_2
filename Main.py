@@ -1,6 +1,7 @@
 import os
 import sys
 from tensorboardX import SummaryWriter
+
 sys.path.extend([os.path.dirname(os.getcwd())])
 import torch
 from torch.utils.data import DataLoader
@@ -12,7 +13,7 @@ from myutils.myLoss import CrossEntropyLoss2d, JensenShannonDivergence
 import warnings
 from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
-from myutils.myUtils import pred2segmentation, dice_loss
+from myutils.myUtils import pred2segmentation, dice_loss, learning_rate_decay
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
@@ -27,15 +28,15 @@ weigth_decay = 1e-6
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 number_workers = 8
-batch_size = 8
-val_batch_size=1
+batch_size = 2
+val_batch_size = 1
 max_epoch_pre = 100
 max_epoch_baseline = 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
-#output_file = open("../output_file_10242018_1epoch.txt", "w")
+# output_file = open("../output_file_10242018_1epoch.txt", "w")
 
 ## visualization
 # board_train_image = Dashboard(server='http://localhost', env="image_train")
@@ -52,11 +53,11 @@ test_data = ISICdata(root=root, model='test', mode='semi', transform=True,
                      dataAugment=False, equalize=Equalize)
 
 labeled_data = DataLoader(labeled_data, batch_size=batch_size, shuffle=True,
-                            num_workers=number_workers, pin_memory=True)
+                          num_workers=number_workers, pin_memory=True)
 unlabeled_data = DataLoader(unlabeled_data, batch_size=batch_size, shuffle=False,
-                              num_workers=number_workers, pin_memory=True)
+                            num_workers=number_workers, pin_memory=True)
 test_data = DataLoader(test_data, batch_size=val_batch_size, shuffle=False,
-                         num_workers=number_workers, pin_memory=True)
+                       num_workers=number_workers, pin_memory=True)
 
 ## networks and optimisers
 net = Enet(class_number)  # Enet network
@@ -66,7 +67,7 @@ segnet = SegNet(class_number)  # SegNet network
 nets = [net, unet, segnet]
 
 for i, net_i in enumerate(nets):
-    nets[i] = net_i.to(device) if (torch.cuda.is_available() and use_cuda) else net_i
+    nets[i] = net_i.to(device)
 
 map_location = lambda storage, loc: storage
 
@@ -79,7 +80,7 @@ optimizers = [optiENet, optiUNet, optiSegNet]
 class_weigth = [1 * 0.1, 3.53]
 class_weigth = torch.Tensor(class_weigth)
 criterion = CrossEntropyLoss2d(class_weigth).to(device) if (
-            torch.cuda.is_available() and use_cuda) else CrossEntropyLoss2d(
+        torch.cuda.is_available() and use_cuda) else CrossEntropyLoss2d(
     class_weigth)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 
@@ -88,15 +89,6 @@ highest_dice_unet = -1
 highest_dice_segnet = -1
 highest_mv_dice_score = -1
 highest_jsd_dice_score = -1
-
-
-def batch_iteration(dataloader:DataLoader)->tuple:
-    try:
-        _, labeled_batch = enumerate(dataloader).__next__()
-    except:
-        labeled_loader_iter = enumerate(dataloader)
-        _, labeled_batch = labeled_loader_iter.__next__()
-    return labeled_batch
 
 
 def pre_train():
@@ -120,10 +112,7 @@ def pre_train():
             dice_meters[idx].reset()
 
         if epoch % 5 == 0:
-            # print('\n')
-            for opti_i in optimizers:
-                for param_group in opti_i.param_groups:
-                    param_group['lr'] = param_group['lr'] * (0.95)
+            learning_rate_decay(optimizers, 0.95)
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
@@ -134,26 +123,22 @@ def pre_train():
                 loss = criterion(pred, mask.squeeze(1))
                 loss.backward()
                 optimizers[idx].step()
-
                 dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
                 dice_meters[idx].add(dice_score)
-                if i==1:
-                    writer.add_image(str(idx),pred2segmentation(pred[0]).cpu().squeeze().numpy(),epoch)
 
+        print(
+            'traing epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
+                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+                dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
+        val_subset_score, ensemble_score = test(nets, nets_path, test_data)
 
-        print('traing epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
-         unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-                                                          dice_meters[1].value()[0], dice_meters[2].value()[0]))
-
-        val_subset_score,ensemble_score=test(nets, nets_path, test_data)
-
-        print('val epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
-         unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(epoch + 1, max_epoch_pre, val_subset_score[0],
-                                                          val_subset_score[1], val_subset_score[2],ensemble_score))
-
-        save(nets, val_subset_score,epoch)
-
+        print('val epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(epoch + 1,
+                                                                                                    max_epoch_pre,
+                                                                                                    val_subset_score[0],
+                                                                                                    val_subset_score[1],
+                                                                                                    val_subset_score[2],
+                                                                                                    ensemble_score))
 
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
@@ -179,12 +164,8 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
 
-
         if epoch % 5 == 0:
-            for opti_i in optimizers:
-                for param_group in opti_i.param_groups:
-                    param_group['lr'] = param_group['lr'] * 0.95
-                    print('learning rate:', param_group['lr'])
+            learning_rate_decay(optimizers,0.95)
 
         # train with labeled data
         labeled_batch = batch_iteration(labeled_loader_)
@@ -205,7 +186,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
                 optimizers[idx].step()
             if method == 'A':
                 lloss_list.append(labeled_loss)
-
 
         # train with unlabeled data
         unlabeled_batch = batch_iteration(unlabeled_loader_)
@@ -306,11 +286,13 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
             if method == 'A':
                 lloss_list.append(labeled_loss)
 
-        print('epoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1,
-                                                                                                                                             max_epoch_baseline,
-                                                                                                                                             dice_meters[0].value()[0],
-                                                                                                                                             dice_meters[1].value()[0],
-                                                                                                                                             dice_meters[2].value()[0]))
+        print(
+            'epoch {0:4d}/{1:4d} ensemble training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
+                epoch + 1,
+                max_epoch_baseline,
+                dice_meters[0].value()[0],
+                dice_meters[1].value()[0],
+                dice_meters[2].value()[0]))
 
         # train with unlabeled data
         unlabeled_batch = batch_iteration(unlabeled_loader_)
@@ -356,10 +338,6 @@ def test(nets_, nets_path_, test_loader_):
     """
     This function performs the evaluation with the test set containing labeled images.
     """
-    global highest_dice_enet
-    global highest_dice_unet
-    global highest_dice_segnet
-
     for i, net_i in enumerate(nets_):
         nets_[i].eval()
 
@@ -379,9 +357,7 @@ def test(nets_, nets_path_, test_loader_):
                 plt.imshow(pred_test[0, 1].cpu().numpy())
 
                 distributions += F.softmax(pred_test, 1)
-                # predicts.append( F.softmax(pred_test, 1))
                 dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
-                # dices.append(dice_test)
                 dice_meters_test[idx].add(dice_test)
 
             distributions /= 3
