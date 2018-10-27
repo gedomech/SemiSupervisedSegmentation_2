@@ -90,13 +90,13 @@ highest_mv_dice_score = -1
 highest_jsd_dice_score = -1
 
 
-def batch_iteration(dataloader:DataLoader)->tuple:
-    try:
-        _, labeled_batch = enumerate(dataloader).__next__()
-    except:
-        labeled_loader_iter = enumerate(dataloader)
-        _, labeled_batch = labeled_loader_iter.__next__()
-    return labeled_batch
+# def batch_iteration(dataloader:DataLoader)->tuple:
+#     try:
+#         _, labeled_batch = enumerate(dataloader).__next__()
+#     except:
+#         labeled_loader_iter = enumerate(dataloader)
+#         _, labeled_batch = labeled_loader_iter.__next__()
+#     return labeled_batch
 
 
 def pre_train():
@@ -126,8 +126,6 @@ def pre_train():
                     param_group['lr'] = param_group['lr'] * (0.95)
 
         for i in tqdm(range(len(labeled_data))):
-        # for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
-        #     img, mask = img.to(device), mask.to(device)
             img, mask, _ = image_batch_generator(labeled_data, batch_size=batch_size,
                                                  number_workers=number_workers, device_=device)
             for idx, net_i in enumerate(nets):
@@ -140,7 +138,7 @@ def pre_train():
                 dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
                 dice_meters[idx].add(dice_score)
                 if i==1:
-                    writer.add_image(str(idx),pred2segmentation(pred[0]).cpu().squeeze().numpy(),epoch)
+                    writer.add_image(str(idx), pred2segmentation(pred[0]).cpu().squeeze().numpy(), epoch)
 
 
 
@@ -148,14 +146,13 @@ def pre_train():
          unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
                                                           dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
-        val_subset_score,ensemble_score=test(nets, nets_path, test_data)
+        val_subset_score, ensemble_score = test(nets, nets_path, test_data)
 
         print('val epoch {0:4d}/{1:4d} pre-training: enet_dice_score: {2:.3f},\
          unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(epoch + 1, max_epoch_pre, val_subset_score[0],
                                                           val_subset_score[1], val_subset_score[2],ensemble_score))
 
         save(nets, val_subset_score,epoch)
-
 
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
@@ -181,7 +178,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
 
-
         if epoch % 5 == 0:
             for opti_i in optimizers:
                 for param_group in opti_i.param_groups:
@@ -189,10 +185,10 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
                     print('learning rate:', param_group['lr'])
 
         # train with labeled data
-        labeled_batch = batch_iteration(labeled_loader_)
-
-        img, mask, _ = labeled_batch
-        img, mask = img.to(device), mask.to(device)
+        img, mask, _ = image_batch_generator(labeled_loader_, batch_size=batch_size,
+                                             number_workers=number_workers, device_=device)
+        # img, mask, _ = labeled_batch
+        # img, mask = img.to(device), mask.to(device)
         lloss_list = []
 
         for idx, net_i in enumerate(nets_):
@@ -210,10 +206,12 @@ def train_baseline(nets_, nets_path_, labeled_loader_: DataLoader, unlabeled_loa
 
 
         # train with unlabeled data
-        unlabeled_batch = batch_iteration(unlabeled_loader_)
+        img, _, _ = image_batch_generator(unlabeled_loader_, batch_size=batch_size,
+                                             number_workers=number_workers, device_=device)
 
-        img, _, _ = unlabeled_batch
-        img = img.to(device)
+        # unlabeled_batch = I(unlabeled_loader_)
+        # img, _, _ = unlabeled_batch
+        # img = img.to(device)
         # computing the majority voting from the output nets
         distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]])
         for idx, net_i in enumerate(nets):
@@ -289,7 +287,7 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
                     print('learning rate:', param_group['lr'])
 
         # train with labeled data
-        labeled_batch = batch_iteration(labeled_loader_)
+        labeled_batch = image_batch_generator(labeled_loader_)
 
         img, mask, _ = labeled_batch
         img, mask = img.to(device), mask.to(device)
@@ -315,10 +313,12 @@ def train_ensemble(nets_, labeled_loader_: DataLoader, unlabeled_loader_: DataLo
                                                                                                                                              dice_meters[2].value()[0]))
 
         # train with unlabeled data
-        unlabeled_batch = batch_iteration(unlabeled_loader_)
+        # unlabeled_batch = batch_iteration(unlabeled_loader_)
+        img, _, _ = image_batch_generator(unlabeled_loader_, batch_size=batch_size,
+                                          number_workers=number_workers, device_=device)
 
-        img, _, _ = unlabeled_batch
-        img = img.to(device)
+        # img, _, _ = unlabeled_batch
+        # img = img.to(device)
 
         nets_probs = []
         # computing nets output
