@@ -50,7 +50,7 @@ def iou_loss(pred, target, n_class):
     return ious
 
 
-def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device_=torch.device):
+def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device=torch.device):
     """
     This function generates batches containing (images, masks, paths)
     :param dataset: torch.utils.data.Dataset object to be loaded
@@ -71,7 +71,7 @@ def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device_=
         labeled_loader_iter = enumerate(data_loader)
         _, data_batch = labeled_loader_iter.__next__()
     img, mask, paths = data_batch
-    return img.to(device_), mask.to(device_), paths
+    return img.to(device_), mask.to(device), paths
 
 
 class Colorize:
