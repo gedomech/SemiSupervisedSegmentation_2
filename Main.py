@@ -12,7 +12,7 @@ from myutils.myLoss import CrossEntropyLoss2d, JensenShannonDivergence
 import warnings
 from tqdm import tqdm
 from torchnet.meter import AverageValueMeter
-from myutils.myUtils import pred2segmentation, dice_loss
+from myutils.myUtils import pred2segmentation, dice_loss, image_batch_generator
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
@@ -125,9 +125,11 @@ def pre_train():
                 for param_group in opti_i.param_groups:
                     param_group['lr'] = param_group['lr'] * (0.95)
 
-        for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
-            img, mask = img.to(device), mask.to(device)
-
+        for i in tqdm(range(len(labeled_data))):
+        # for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
+        #     img, mask = img.to(device), mask.to(device)
+            img, mask, _ = image_batch_generator(labeled_data, batch_size=batch_size,
+                                                 number_workers=number_workers, device_=device)
             for idx, net_i in enumerate(nets):
                 optimizers[idx].zero_grad()
                 pred = nets[idx](img)
