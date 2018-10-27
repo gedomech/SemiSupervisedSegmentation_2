@@ -74,15 +74,31 @@ def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device=t
     return img.to(device), mask.to(device), paths
 
 
-def save_models(nets, score=None, epoch=0):
+def save_models(nets_, nets_path_, score_meters=None, mv_score_meter=None, epoch=0):
     """
-
-    :param nets:
-    :param score:
-    :param epoch:
+    This function saves the parameters of the nets
+    :param nets_: networks containing the parameters to be saved
+    :param nets_path_: list of path where each net will be saved
+    :param score_meters: list of torchnet.meter.AverageValueMeter objects corresponding with each net
+    :param epoch: epoch which was obtained the scores
     :return:
     """
-    pass
+    for idx, net_i in enumerate(nets_):
+
+        if (idx == 0) and (highest_dice_enet < score_meters[idx].value()[0]):
+            highest_dice_enet = mv_score_meter.value()[0]
+            # print('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
+            torch.save(net_i.state_dict(), nets_path_[idx])
+
+        elif (idx == 1) and (highest_dice_unet < score_meters[idx].value()[0]):
+            highest_dice_unet = mv_score_meter.value()[0]
+            # print('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
+            torch.save(net_i.state_dict(), nets_path_[idx])
+
+        elif (idx == 2) and (highest_dice_segnet < score_meters[idx].value()[0]):
+            highest_dice_segnet = mv_score_meter.value()[0]
+            # print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
+            torch.save(net_i.state_dict(), nets_path_[idx])
 
 
 class Colorize:
