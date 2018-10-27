@@ -56,7 +56,7 @@ def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device=t
     :param dataset: torch.utils.data.Dataset object to be loaded
     :param batch_size: size of the batch
     :param number_workers: number of threads used to load data
-    :param device_: torch.device object where images and masks will be located.
+    :param device: torch.device object where images and masks will be located.
     :return: (images, masks, paths)
     """
     if not issubclass(type(dataset), torch.utils.data.Dataset):
@@ -71,7 +71,7 @@ def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device=t
         labeled_loader_iter = enumerate(data_loader)
         _, data_batch = labeled_loader_iter.__next__()
     img, mask, paths = data_batch
-    return img.to(device_), mask.to(device), paths
+    return img.to(device), mask.to(device), paths
 
 
 class Colorize:
