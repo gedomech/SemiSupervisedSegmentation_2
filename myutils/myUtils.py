@@ -52,16 +52,12 @@ def iou_loss(pred, target, n_class):
 
 def image_batch_generator(dataset=None, batch_size=1, number_workers=1, device_=torch.device):
     """
-
     This function generates batches containing (images, masks, paths)
-    :param dataloader_: Dataloader object to manage the data loading.
+    :param dataset: torch.utils.data.Dataset object to be loaded
+    :param batch_size: size of the batch
+    :param number_workers: number of threads used to load data
     :param device_: torch.device object where images and masks will be located.
     :return: (images, masks, paths)
-    :param dataset: torch.utils.data.Dataset object to be
-    :param batch_size:
-    :param number_workers:
-    :param device_:
-    :return:
     """
     if not issubclass(type(dataset), torch.utils.data.Dataset):
         raise TypeError("Input must be an instance of the torch.utils.data.Dataset class")
