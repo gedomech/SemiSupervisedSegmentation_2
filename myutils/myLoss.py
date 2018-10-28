@@ -16,7 +16,7 @@ class CrossEntropyLoss2d(nn.Module):
 
 class JensenShannonDivergence(nn.Module):
 
-    def __init__(self, reduce=True,size_average=True):
+    def __init__(self, reduce=True, size_average=False):
         super().__init__()
 
         self.loss = nn.KLDivLoss(reduce=reduce, size_average=size_average)
