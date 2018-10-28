@@ -172,9 +172,9 @@ def batch_labeled_loss_(img,mask,nets,criterion):
     return prediction_list, loss_list, dice_score
 
 
-
 from torchnet.meter import AverageValueMeter
 import torch.nn.functional as F
+
 
 def test(nets_,  test_loader_,device, **kwargs):
     class_number =2

@@ -128,8 +128,8 @@ def pre_train():
                 ensemble_score.value()[0]))
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
 
-    # train_baseline(nets, nets_path, labeled_data, unlabeled_data, )
-    #train_ensemble(nets, nets_path, labeled_data, unlabeled_data, )
+    # train_baseline(nets, nets_path, labeled_data, unlabeled_data)
+    # train_ensemble(nets, nets_path, labeled_data, unlabeled_data )
 
 
 def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
@@ -217,5 +217,15 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 
 
 if __name__ == "__main__":
-    pre_train()
+    # Pre-training Stage
+    #pre_train()
+
+    # Baseline Training Stage
+    nets_path = ['checkpoint/best_ENet_pre-trained.pth',
+                 'checkpoint/best_UNet_pre-trained.pth',
+                 'checkpoint/best_SegNet_pre-trained.pth']
+
+    train_baseline(nets, nets_path, labeled_data, unlabeled_data)
+
+
     # train_ensemble()
