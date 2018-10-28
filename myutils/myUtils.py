@@ -196,7 +196,7 @@ def test(nets_,  test_loader_,device, **kwargs):
 
             for idx, net_i in enumerate(nets_):
                 pred_test = nets_[idx](img)
-                plt.imshow(pred_test[0, 1].cpu().numpy())
+                # plt.imshow(pred_test[0, 1].cpu().numpy())
 
                 distributions += F.softmax(pred_test, 1)
                 dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
