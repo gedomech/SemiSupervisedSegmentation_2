@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 writer = SummaryWriter()
 
 # torch.set_num_threads(3)  # set by deafault to 1
-root = "dataset"
+root = "datasets/ISIC2018"
 
 class_number = 2
 lr = 1e-4
@@ -137,8 +137,8 @@ def pre_train():
 
                 dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
                 dice_meters[idx].add(dice_score)
-                if i==1:
-                    writer.add_image(str(idx),pred2segmentation(pred[0]).cpu().squeeze().numpy(),epoch)
+                #if i==1:
+                #    writer.add_image(str(idx),pred2segmentation(pred[0]).cpu().squeeze().numpy(),epoch)
 
 
 
@@ -152,7 +152,7 @@ def pre_train():
          unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(epoch + 1, max_epoch_pre, val_subset_score[0],
                                                           val_subset_score[1], val_subset_score[2],ensemble_score))
 
-        save(nets, val_subset_score,epoch)
+        #save(nets, val_subset_score,epoch)
 
 
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
@@ -376,7 +376,7 @@ def test(nets_, nets_path_, test_loader_):
 
             for idx, net_i in enumerate(nets_):
                 pred_test = nets[idx](img)
-                plt.imshow(pred_test[0, 1].cpu().numpy())
+                # plt.imshow(pred_test[0, 1].cpu().numpy())
 
                 distributions += F.softmax(pred_test, 1)
                 # predicts.append( F.softmax(pred_test, 1))
