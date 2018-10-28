@@ -1,11 +1,11 @@
-from PIL import Image, ImageEnhance,ImageOps,ImageFilter
-import numpy as np
+import os
 import random
-import os,matplotlib.pyplot as plt
-import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision import utils,transforms
+
+import numpy as np
 import pandas as pd
+from PIL import Image, ImageEnhance, ImageOps, ImageFilter
+from torch.utils.data import Dataset
+from torchvision import transforms
 
 num_class = 2
 spit_ratio = 0.9
@@ -54,11 +54,11 @@ class ISICdata(Dataset):
         elif self.mode=="semi":
             assert model in ('labeled', 'unlabeled', 'test'), "the model should be always in 'labeled', 'unlabeled' or 'test', given '%s'." % model
             if self.model=="labeled":
-                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'labeled_tr.csv'))
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_labeled_tr.csv'))
             elif self.model=="unlabeled":
-                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'unlabeled_tr.csv'))
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_unlabeled_tr.csv'))
             elif self.model == "test":
-                img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'test.csv'))
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'random_test.csv'))
 
         self.imgs = img_gts_list['img'].values
         self.gts = img_gts_list['label'].values
@@ -128,7 +128,7 @@ class ISICdata(Dataset):
         return img, mask
 
     def __len__(self):
-        return int(len(self.imgs))
+        return int(len(self.imgs) / 50)
 
 
 

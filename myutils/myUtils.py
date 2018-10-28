@@ -1,7 +1,11 @@
+import torch
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import numpy as np,pandas as pd, matplotlib.pyplot as plt
-from PIL import Image
+from torch.utils.data import DataLoader
+
+from myutils.myLoss import JensenShannonDivergence
+
 
 def colormap(n):
     cmap=np.zeros([n, 3]).astype(np.uint8)
@@ -50,6 +54,55 @@ def iou_loss(pred, target, n_class):
     return ious
 
 
+def image_batch_generator(dataset=None, device=torch.device):
+    """
+    This function generates batches containing (images, masks, paths)
+    :param dataset: torch.utils.data.Dataset object to be loaded
+    :param batch_size: size of the batch
+    :param number_workers: number of threads used to load data
+    :param device: torch.device object where images and masks will be located.
+    :return: (images, masks, paths)
+    """
+    if not issubclass(type(dataset), DataLoader):
+        raise TypeError("Input must be an instance of the torch.utils.data.Dataset class")
+
+
+    try:
+        _, data_batch = enumerate(dataset).__next__()
+    except:
+        labeled_loader_iter = enumerate(dataset)
+        _, data_batch = labeled_loader_iter.__next__()
+    img, mask, paths = data_batch
+    return img.to(device), mask.to(device), paths
+
+
+def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dict=None, ):
+    """
+    This function saves the parameters of the nets
+    :param nets_: networks containing the parameters to be saved
+    :param nets_path_: list of path where each net will be saved
+    :param score_meters: list of torchnet.meter.AverageValueMeter objects corresponding with each net
+    :param epoch: epoch which was obtained the scores
+    :return:
+    """
+
+    for idx, net_i in enumerate(nets_):
+
+        if (idx == 0) and ( history_score_dict['enet'] <score_meters[idx].value()[0]):
+            history_score_dict['enet'] = score_meters[idx].value()[0]
+            # print('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
+            torch.save(net_i.state_dict(), nets_path_[idx])
+
+        elif (idx == 1) and (history_score_dict['unet'] < score_meters[idx].value()[0]):
+            history_score_dict['unet'] = score_meters[idx].value()[0]
+            # print('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
+            torch.save(net_i.state_dict(), nets_path_[idx])
+
+        elif (idx == 2) and (history_score_dict['segnet'] < score_meters[idx].value()[0]):
+            history_score_dict['segnet']= score_meters[idx].value()[0]
+            # print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
+            torch.save(net_i.state_dict(), nets_path_[idx])
+    return history_score_dict
 
 
 class Colorize:
@@ -93,3 +146,92 @@ def showImages(board,image_batch, mask_batch,segment_batch):
     board.image(image_batch[0], 'original image')
     board.image(color_transform(mask_batch[0]), 'ground truth image')
     board.image(color_transform(segment_batch[0]), 'prediction given by the net')
+
+
+def learning_rate_decay(optims, factor=0.95):
+    for opti_i in optims:
+        for param_group in opti_i.param_groups:
+            param_group['lr'] = param_group['lr'] * factor
+
+def map_(func,*list):
+    return [*map(func,*list)]
+
+
+def batch_labeled_loss_(img,mask,nets,criterion):
+    loss_list = []
+    prediction_list = []
+    dice_score = []
+    for net_i in nets:
+        pred = net_i(img)
+        labeled_loss = criterion(pred, mask.squeeze(1))
+        loss_list.append(labeled_loss)
+        ds = dice_loss(pred2segmentation(net_i(img)), mask.squeeze(1))
+        dice_score.append(ds)
+        prediction_list.append(pred)
+
+    return prediction_list, loss_list, dice_score
+
+
+
+from torchnet.meter import AverageValueMeter
+import torch.nn.functional as F
+
+def test(nets_,  test_loader_,device, **kwargs):
+    class_number =2
+
+    """
+    This function performs the evaluation with the test set containing labeled images.
+    """
+
+    map_(lambda x:x.eval(), nets_)
+
+    dice_meters_test = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+    mv_dice_score_meter = AverageValueMeter()
+
+    with torch.no_grad():
+        for i,(img, mask , _) in enumerate(test_loader_):
+
+            (img, mask) = img.to(device), mask.to(device)
+            distributions = torch.zeros([img.shape[0], class_number, img.shape[2], img.shape[3]]).to(device)
+
+            for idx, net_i in enumerate(nets_):
+                pred_test = nets_[idx](img)
+                plt.imshow(pred_test[0, 1].cpu().numpy())
+
+                distributions += F.softmax(pred_test, 1)
+                dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
+                dice_meters_test[idx].add(dice_test)
+
+            distributions /= 3
+            mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
+            mv_dice_score_meter.add(mv_dice_score.item())
+
+    map_(lambda x:x.train(), nets_)
+
+    return [dice_meters_test[idx] for idx in range(3)], mv_dice_score_meter
+
+
+def get_mv_based_labels(imgs,nets):
+    class_number =2
+    prediction = []
+    distributions = torch.zeros([imgs.shape[0], class_number, imgs.shape[2], imgs.shape[3]]).to(imgs.dtype)
+    for idx, (net_i) in enumerate(nets):
+        pred = F.softmax(net_i(imgs))
+        prediction.append(pred)
+        distributions+=pred
+    distributions/=3
+    return pred2segmentation(distributions), prediction
+
+def cotraining(prediction, pseudolabel,nets,criterion):
+    loss = []
+    for idx, net_i in enumerate(nets):
+        unlabled_loss = criterion(prediction[idx], pseudolabel)
+        loss.append(unlabled_loss)
+    return loss
+
+
+def get_loss(predictions):
+    p = torch.cat(predictions)
+    criteron = JensenShannonDivergence()
+    loss = criteron(p)
+    return loss
