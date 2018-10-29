@@ -142,6 +142,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     nets_path = ['checkpoint/best_ENet_baseline.pth',
                  'checkpoint/best_UNet_baseline.pth',
                  'checkpoint/best_SegNet_baseline.pth']
+    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
@@ -158,15 +159,31 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             # train with unlabeled data
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
             pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
-            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion)
+            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion, device=device)
             total_loss = [x + y for x, y in zip(llost_list, ulost_list)]
 
             for idx in range(len(optimizers)):
                 optimizers[idx].zero_grad()
                 total_loss[idx].backward()
                 optimizers[idx].step()
+                dice_meters[idx].add(dice_score[idx])
+
+        print(
+            'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}'.format(
+                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+                dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
         score_meters, ensemble_score = test(nets, test_data, device=device)
+
+        print(
+            'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
+                epoch + 1,
+                max_epoch_pre,
+                score_meters[0].value()[0],
+                score_meters[1].value()[0],
+                score_meters[2].value()[0],
+                ensemble_score.value()[0]))
+
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
