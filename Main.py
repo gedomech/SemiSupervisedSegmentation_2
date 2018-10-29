@@ -29,7 +29,7 @@ unlabeled_batch_size = 1
 val_batch_size = 1
 
 max_epoch_pre = 100
-max_epoch_baseline = 1
+max_epoch_baseline = 25
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -226,6 +226,5 @@ if __name__ == "__main__":
                  'checkpoint/best_SegNet_pre-trained.pth']
 
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
-
 
     # train_ensemble()
