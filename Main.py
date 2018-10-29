@@ -143,7 +143,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
-    # loading pre-trained models
+    #  loading pre-trained models
     map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
     global historical_score_dict
     nets_path = ['checkpoint/best_ENet_baseline.pth',
