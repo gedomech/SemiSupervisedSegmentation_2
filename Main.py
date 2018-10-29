@@ -29,7 +29,7 @@ unlabeled_batch_size = 1
 val_batch_size = 1
 
 max_epoch_pre = 100
-max_epoch_baseline = 1
+max_epoch_baseline = 25
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -43,12 +43,19 @@ unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=T
 test_data = ISICdata(root=root, model='test', mode='semi', transform=True,
                      dataAugment=False, equalize=Equalize)
 
-labeled_data = DataLoader(labeled_data, batch_size=labeled_batch_size, shuffle=True,
-                          num_workers=number_workers, pin_memory=True)
-unlabeled_data = DataLoader(unlabeled_data, batch_size=unlabeled_batch_size, shuffle=False,
-                            num_workers=number_workers, pin_memory=True)
-test_data = DataLoader(test_data, batch_size=val_batch_size, shuffle=False,
-                       num_workers=number_workers, pin_memory=True)
+labeled_loader_params = {'batch_size': labeled_batch_size,
+                         'shuffle': True,
+                         'num_workers': number_workers,
+                         'pin_memory': True}
+
+unlabeled_loader_params = {'batch_size': unlabeled_batch_size,
+                           'shuffle': True,
+                           'num_workers': number_workers,
+                           'pin_memory': True}
+
+labeled_data = DataLoader(labeled_data, **labeled_loader_params)
+unlabeled_data = DataLoader(unlabeled_data, **unlabeled_loader_params)
+test_data = DataLoader(test_data, **unlabeled_loader_params)
 
 ## networks and optimisers
 nets = [Enet(class_number),
@@ -136,57 +143,58 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
-    # loading pre-trained models
-    map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
-    global historical_score_dict
-    nets_path = ['checkpoint/best_ENet_baseline.pth',
-                 'checkpoint/best_UNet_baseline.pth',
-                 'checkpoint/best_SegNet_baseline.pth']
-    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+    # # loading pre-trained models
+    # map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
+    # global historical_score_dict
+    # nets_path = ['checkpoint/best_ENet_baseline.pth',
+    #              'checkpoint/best_UNet_baseline.pth',
+    #              'checkpoint/best_SegNet_baseline.pth']
+    # dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
 
-        if epoch % 5 == 0:
-            learning_rate_decay(optimizers, 0.95)
-
-        # train with labeled data
+        # if epoch % 5 == 0:
+        #     learning_rate_decay(optimizers, 0.95)
+        #
+        # # train with labeled data
         for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
-
-            imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
-            _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
-
-            # train with unlabeled data
-            imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
-            pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
-            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion, device=device)
-            total_loss = [x + y for x, y in zip(llost_list, ulost_list)]
-
-            for idx in range(len(optimizers)):
-                optimizers[idx].zero_grad()
-                total_loss[idx].backward()
-                optimizers[idx].step()
-                dice_meters[idx].add(dice_score[idx])
-
-        print(
-            'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-                dice_meters[1].value()[0], dice_meters[2].value()[0]))
-
-        score_meters, ensemble_score = test(nets, test_data, device=device)
-
-        print(
-            'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
-                epoch + 1,
-                max_epoch_pre,
-                score_meters[0].value()[0],
-                score_meters[1].value()[0],
-                score_meters[2].value()[0],
-                ensemble_score.value()[0]))
-
-        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
-        if ensemble_score.value()[0] > historical_score_dict['mv']:
-            historical_score_dict['mv'] = ensemble_score.value()[0]
+            pass
+        #
+        #     imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
+        #     _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
+        #
+        #     # train with unlabeled data
+        #     imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
+        #     pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
+        #     ulost_list = cotraining(predictions, pseudolabel, nets_, criterion, device=device)
+        #     total_loss = [x + y for x, y in zip(llost_list, ulost_list)]
+        #
+        #     for idx in range(len(optimizers)):
+        #         optimizers[idx].zero_grad()
+        #         total_loss[idx].backward()
+        #         optimizers[idx].step()
+        #         dice_meters[idx].add(dice_score[idx])
+        print("ksksk")
+        # print(
+        #     'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}'.format(
+        #         epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+        #         dice_meters[1].value()[0], dice_meters[2].value()[0]))
+        #
+        # score_meters, ensemble_score = test(nets, test_data, device=device)
+        #
+        # print(
+        #     'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
+        #         epoch + 1,
+        #         max_epoch_pre,
+        #         score_meters[0].value()[0],
+        #         score_meters[1].value()[0],
+        #         score_meters[2].value()[0],
+        #         ensemble_score.value()[0]))
+        #
+        # historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+        # if ensemble_score.value()[0] > historical_score_dict['mv']:
+        #     historical_score_dict['mv'] = ensemble_score.value()[0]
 
 
 def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
