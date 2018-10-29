@@ -156,6 +156,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
+        
         # train with labeled data
         for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
 
