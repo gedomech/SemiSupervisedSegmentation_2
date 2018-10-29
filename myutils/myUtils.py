@@ -222,10 +222,11 @@ def get_mv_based_labels(imgs,nets):
     distributions/=3
     return pred2segmentation(distributions), prediction
 
-def cotraining(prediction, pseudolabel,nets,criterion):
+
+def cotraining(prediction, pseudolabel,nets,criterion,device):
     loss = []
     for idx, net_i in enumerate(nets):
-        unlabled_loss = criterion(prediction[idx], pseudolabel.to(torch.device('cuda')))
+        unlabled_loss = criterion(prediction[idx], pseudolabel.to(device))
         loss.append(unlabled_loss)
     return loss
 
