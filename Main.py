@@ -152,7 +152,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     for epoch in range(max_epoch_baseline):
-    	print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
+        print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
 
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
