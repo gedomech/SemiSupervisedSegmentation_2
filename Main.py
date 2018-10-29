@@ -150,7 +150,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                  'checkpoint/best_UNet_baseline.pth',
                  'checkpoint/best_SegNet_baseline.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
-
+    print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
 
@@ -243,12 +243,12 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 if __name__ == "__main__":
     # Pre-training Stage
     #pre_train()
-
+    print("Baseline Training Stage")
     # Baseline Training Stage
     nets_path = ['checkpoint/best_ENet_pre-trained.pth',
                  'checkpoint/best_UNet_pre-trained.pth',
                  'checkpoint/best_SegNet_pre-trained.pth']
-
+    print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
     # train_ensemble()
