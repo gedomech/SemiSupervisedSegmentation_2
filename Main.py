@@ -125,6 +125,8 @@ def pre_train():
 
         score_meters, ensemble_score = test(nets, test_data, device=device)
 
+        visualize(nets, dataset, number_of_images)
+
         print(
             'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(
                 epoch + 1,
