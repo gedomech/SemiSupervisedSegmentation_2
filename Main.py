@@ -23,19 +23,19 @@ lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-number_workers = 0
-labeled_batch_size = 2
-unlabeled_batch_size = 1
+number_workers = 4
+labeled_batch_size = 4
+unlabeled_batch_size = 4
 val_batch_size = 1
 
 max_epoch_pre = 100
-max_epoch_baseline = 25
+max_epoch_baseline = 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
 Equalize = False
-## data for semi-supervised training
+# data for semi-supervised training
 labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
                         dataAugment=False, equalize=Equalize)
 unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=True,
