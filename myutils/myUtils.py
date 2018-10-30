@@ -205,13 +205,13 @@ def test(nets_,  test_loader_,device, **kwargs):
                 dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
                 dice_meters_test[idx].add(dice_test)
 
-            distributions /= 3
+            distributions /= len(nets_)
             mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
             mv_dice_score_meter.add(mv_dice_score.item())
 
     map_(lambda x:x.train(), nets_)
 
-    return [dice_meters_test[idx] for idx in range(3)], mv_dice_score_meter
+    return [dice_meters_test[idx] for idx in range(len(nets_))], mv_dice_score_meter
 
 
 def get_mv_based_labels(imgs,nets):
@@ -222,7 +222,7 @@ def get_mv_based_labels(imgs,nets):
         pred = F.softmax(net_i(imgs))
         prediction.append(pred)
         distributions+=pred.cpu()
-    distributions/=3
+    distributions /= len(nets)
     return pred2segmentation(distributions), prediction
 
 
