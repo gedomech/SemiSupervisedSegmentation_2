@@ -4,6 +4,9 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+import torchvision.utils as vutils
+from tensorboardX import SummaryWriter
+
 from myutils.myLoss import JensenShannonDivergence
 
 
@@ -236,3 +239,47 @@ def get_loss(predictions):
     criteron = JensenShannonDivergence()
     loss = criteron(p)
     return loss
+
+
+def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, padding=2,
+              normalize=False, range=None, scale_each=False, pad_value=0):
+    """
+    Visualize n_images from the input set of images (image_set).
+    :param nets_: networks used to extract the predictions from the input images
+    :param image_set: set of images to be visualized
+    :param n_images: number of images that really will be visualized
+    :param c_epoch: current epoch
+    :param randomly: indicates if n_images will be randomly taken from image_set
+
+    The rest of parameters correspond to the input arguments of torchvision.utils.make_grid.
+    For more documentation refers to https://pytorch.org/docs/stable/torchvision/utils.html
+    :param nrow:
+    :param padding:
+    :param normalize:
+    :param range:
+    :param scale_each:
+    :param pad_value:
+    :return:
+    """
+
+    n_samples = np.min([image_set.shape[0], n_images])
+
+    if randomly:
+        idx = np.random.randint(low=0, high=image_set.shape[0], size=n_samples)
+    else:
+        idx = np.arange(n_samples)
+
+    writer = SummaryWriter()
+    imgs = image_set[idx, :, :, :]
+    for idx, net_i in enumerate(nets_):
+        pred_grid = vutils.make_grid(net_i(imgs).cpu(), nrow=nrow, padding=padding, pad_value=pad_value,
+                                     normalize=normalize, range=range, scale_each=scale_each)
+        if idx == 0:
+            writer.add_image('Enet Predictions', pred_grid, c_epoch)  # Tensor
+        elif idx == 1:
+            writer.add_image('Unet Predictions', pred_grid, c_epoch)  # Tensor
+        else:
+            writer.add_image('SegNet Predictions', pred_grid, c_epoch)  # Tensor
+
+    writer.close()
+
