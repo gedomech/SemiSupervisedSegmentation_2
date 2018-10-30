@@ -245,12 +245,12 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 if __name__ == "__main__":
     # Pre-training Stage
     #pre_train()
-    print("Baseline Training Stage")
+    # print("Baseline Training Stage")
     # Baseline Training Stage
     nets_path = ['checkpoint/best_ENet_pre-trained.pth',
                  'checkpoint/best_UNet_pre-trained.pth',
                  'checkpoint/best_SegNet_pre-trained.pth']
-    print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
+    # print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
     # train_ensemble()
