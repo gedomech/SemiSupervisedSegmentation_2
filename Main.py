@@ -17,6 +17,8 @@ writer = SummaryWriter()
 
 # torch.set_num_threads(3)  # set by deafault to 1
 root = "datasets/ISIC2018"
+writer = SummaryWriter()
+
 
 class_number = 2
 lr = 1e-4
@@ -29,7 +31,7 @@ unlabeled_batch_size = 1
 val_batch_size = 1
 
 max_epoch_pre = 100
-max_epoch_baseline = 25
+max_epoch_baseline = 1
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -146,7 +148,8 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
     #  loading pre-trained models
-    map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
+
+    map_(lambda x, y: [x.load_state_dict(torch.load(y,map_location='cpu')), x.train()], nets_, nets_path_)
     global historical_score_dict
     nets_path = ['checkpoint/best_ENet_baseline.pth',
                  'checkpoint/best_UNet_baseline.pth',
@@ -160,7 +163,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             learning_rate_decay(optimizers, 0.95)
         
         # train with labeled data
-        for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
+        for _ in tqdm(range(1)):
 
             imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
@@ -182,7 +185,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
                 dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
-        score_meters, ensemble_score = test(nets, test_data, device=device)
+        score_meters, ensemble_score = test(nets_, test_data, device=device)
 
         print(
             'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
@@ -193,9 +196,11 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 score_meters[2].value()[0],
                 ensemble_score.value()[0]))
 
-        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+        historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
+
+        visualize(writer,nets_,unlabeled_loader_,8,epoch,randomly=False)
 
 
 def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
@@ -220,7 +225,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
-        for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
+        for _ in tqdm(range(2)): #max(len(labeled_loader_), len(unlabeled_loader_)
             # === train with labeled data ===
             imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
@@ -236,8 +241,8 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 total_loss[idx].backward(retain_graph=True)
                 optim.step()
 
-        score_meters, ensemble_score = test(nets, test_data, device=device)
-        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+        score_meters, ensemble_score = test(nets_, test_data, device=device)
+        historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['jsd']:
             historical_score_dict['jsd'] = ensemble_score.value()[0]
 

@@ -241,7 +241,7 @@ def get_loss(predictions):
     return loss
 
 
-def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, padding=2,
+def visualize(writer, nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, padding=2,
               normalize=False, range=None, scale_each=False, pad_value=0):
     """
     Visualize n_images from the input set of images (image_set).
@@ -269,7 +269,6 @@ def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, paddi
     else:
         idx = np.arange(n_samples)
 
-    writer = SummaryWriter()
     imgs = image_set[idx, :, :, :]
     for idx, net_i in enumerate(nets_):
         pred_grid = vutils.make_grid(net_i(imgs).cpu(), nrow=nrow, padding=padding, pad_value=pad_value,
@@ -281,5 +280,4 @@ def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, paddi
         else:
             writer.add_image('SegNet Predictions', pred_grid, c_epoch)  # Tensor
 
-    writer.close()
 
