@@ -184,12 +184,18 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                          'SegNet_Score': score_meters[1].value()[0],
                          'MV_Score': ensemble_score.value()[0]})
 
-    #print("STARTING THE BASELINE TRAINING!!!!")
+    # testing the Jizong's hypothesis about learning rate decay
+    # (set lr = 1e-4 or lr = 1e-5 during all training)
+    LEARNING_RATE = 1e-4
+    for opti_i in optimizers:
+        for param_group in opti_i.param_groups:
+            param_group['lr'] = LEARNING_RATE = 1e-4
+
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
 
-        if epoch % 5 == 0:
-            learning_rate_decay(optimizers, 0.95)
+        # if epoch % 5 == 0:
+        #     learning_rate_decay(optimizers, 0.95)
         
         # train with labeled data
         for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
@@ -254,7 +260,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
     """
 
     global historical_score_dict
-    map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
+    map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location=lambda storage, loc: storage)), x.train()], nets_, nets_path_)
 
     nets_path = ['checkpoint/best_ENet_ensemble.pth',
                  # 'checkpoint/best_UNet_ensemble.pth',
@@ -262,13 +268,35 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
 
     dice_meters = [AverageValueMeter(), AverageValueMeter()]#, AverageValueMeter()]
 
+    # testing initialization
+    score_meters, ensemble_score = test(nets_, test_data, device=device)
+
+    print(
+        'val before starting ensemble training: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
+            0,
+            max_epoch_pre,
+            score_meters[0].value()[0],
+            score_meters[1].value()[0],
+            ensemble_score.value()[0]))
+    cvs_writer.writerow({'Epoch': 0,
+                         'ENet_Score': score_meters[0].value()[0],
+                         'SegNet_Score': score_meters[1].value()[0],
+                         'MV_Score': ensemble_score.value()[0]})
+
+    # testing the Jizong's hypothesis about learning rate decay
+    # (set lr = 1e-4 or lr = 1e-5 during all training)
+    LEARNING_RATE = 1e-4
+    for opti_i in optimizers:
+        for param_group in opti_i.param_groups:
+            param_group['lr'] = LEARNING_RATE = 1e-4
+
     for epoch in range(max_epoch_ensemble):
         print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
 
-        if epoch % 5 == 0:
-            learning_rate_decay(optimizers, 0.95)
+        # if epoch % 5 == 0:
+        #     learning_rate_decay(optimizers, 0.95)
 
         for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):
             # === train with labeled data ===
@@ -279,7 +307,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
             pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
             jsdLoss = get_loss(predictions)
-            jsdLoss.requires_grad = False
+            # jsdLoss.requires_grad = False
 
             total_loss = [x + jsdLoss for x in llost_list]
             for idx, optim in enumerate(optimizers):
@@ -355,8 +383,9 @@ if __name__ == "__main__":
     # nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
     #               # 'checkpoint/best_UNet_pre-trained.pth',
     #               'checkpoint/best_SegNet_pre-trained.pth']
-    # baseline_file = open('output_baseline_31102018.csv', 'w')
-    # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-    # baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
-    # baseline_writer.writeheader()
-    # train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
+    # print('STARTING THE ENSEMBLE TRAINING STAGE')
+    # ensemble_file = open('output_ensemble_31102018.csv', 'w')
+    # ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+    # ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
+    # ensemble_writer.writeheader()
+    # train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
