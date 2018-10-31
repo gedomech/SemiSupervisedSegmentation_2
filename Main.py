@@ -32,7 +32,7 @@ unlabeled_batch_size = 4
 val_batch_size = 1
 
 max_epoch_pre = 100
-max_epoch_baseline = 100
+max_epoch_baseline = 2 # 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -168,6 +168,22 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                  #'checkpoint/best_UNet_baseline.pth',
                  'checkpoint/best_SegNet_baseline.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter()]#, AverageValueMeter()]
+
+    # testing initialization
+    score_meters, ensemble_score = test(nets_, test_data, device=device)
+
+    print(
+        'val before starting baseline training: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
+            0,
+            max_epoch_pre,
+            score_meters[0].value()[0],
+            score_meters[1].value()[0],
+            ensemble_score.value()[0]))
+    cvs_writer.writerow({'Epoch': 0,
+                         'ENet_Score': score_meters[0].value()[0],
+                         'SegNet_Score': score_meters[1].value()[0],
+                         'MV_Score': ensemble_score.value()[0]})
+
     #print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
@@ -297,50 +313,50 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
 
 
 if __name__ == "__main__":
-    # PRE_TRAINING = False
-    # BASELINE = False
-    # ENSEMBLE = False
-    #
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--pre-training", type=str2bool, nargs='?', const=False, default=PRE_TRAINING,
-    #                     help="Whether to pre-train the models.")
-    # parser.add_argument("--baseline", type=str2bool, nargs='?', const=False, default=BASELINE,
-    #                     help="Whether to train the baseline models.")
-    # parser.add_argument("--ensemble", type=str2bool, nargs='?', const=False, default=ENSEMBLE,
-    #                     help="Whether to train the ensemble models.")
-    #
-    # args = parser.parse_args()
-    #
-    # nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
-    #               # 'checkpoint/best_UNet_pre-trained.pth',
-    #               'checkpoint/best_SegNet_pre-trained.pth']
-    #
-    # if args.pre_training:
-    #     # Pre-training Stage
-    #     print('STARTING THE PRE-TRAINING STAGE')
-    #     pre_train()
-    # elif args.baseline:
-    #     # Baseline Training Stage
-    #     print('STARTING THE BASELINE TRAINING STAGE')
-    #     baseline_file = open('output_baseline_31102018.csv', 'w')
-    #     baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-    #     baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
-    #     baseline_writer.writeheader()
-    #     train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
-    # elif args.ensemble:
-    #     # Ensemble Training Stage
-    #     print('STARTING THE ENSEMBLE TRAINING STAGE')
-    #     ensemble_file = open('output_ensemble_31102018.csv', 'w')
-    #     ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-    #     ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
-    #     ensemble_writer.writeheader()
-    #     train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
+    PRE_TRAINING = False
+    BASELINE = False
+    ENSEMBLE = False
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pre-training", type=str2bool, nargs='?', const=False, default=PRE_TRAINING,
+                        help="Whether to pre-train the models.")
+    parser.add_argument("--baseline", type=str2bool, nargs='?', const=False, default=BASELINE,
+                        help="Whether to train the baseline models.")
+    parser.add_argument("--ensemble", type=str2bool, nargs='?', const=False, default=ENSEMBLE,
+                        help="Whether to train the ensemble models.")
+
+    args = parser.parse_args()
 
     nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
                   # 'checkpoint/best_UNet_pre-trained.pth',
                   'checkpoint/best_SegNet_pre-trained.pth']
-    baseline_file = open('output_baseline_31102018.csv', 'w')
-    baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-    baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
-    baseline_writer.writeheader()
-    train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
+
+    if args.pre_training:
+        # Pre-training Stage
+        print('STARTING THE PRE-TRAINING STAGE')
+        pre_train()
+    elif args.baseline:
+        # Baseline Training Stage
+        print('STARTING THE BASELINE TRAINING STAGE')
+        baseline_file = open('output_baseline_31102018.csv', 'w')
+        baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
+        baseline_writer.writeheader()
+        train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
+    elif args.ensemble:
+        # Ensemble Training Stage
+        print('STARTING THE ENSEMBLE TRAINING STAGE')
+        ensemble_file = open('output_ensemble_31102018.csv', 'w')
+        ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
+        ensemble_writer.writeheader()
+        train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
+
+    # nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
+    #               # 'checkpoint/best_UNet_pre-trained.pth',
+    #               'checkpoint/best_SegNet_pre-trained.pth']
+    # baseline_file = open('output_baseline_31102018.csv', 'w')
+    # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+    # baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
+    # baseline_writer.writeheader()
+    # train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
