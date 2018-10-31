@@ -264,6 +264,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
             pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
             jsdLoss = get_loss(predictions)
+            jsdLoss.requires_grad = False
 
             total_loss = [x + jsdLoss for x in llost_list]
             for idx, optim in enumerate(optimizers):
