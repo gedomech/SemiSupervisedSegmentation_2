@@ -131,8 +131,7 @@ class ISICdata(Dataset):
         return int(len(self.imgs) / 10)
 
 
-
-if __name__ =="__main__":
+if __name__ == "__main__":
     import platform
     from torchnet.meter import AverageValueMeter
     import tqdm
