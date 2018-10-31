@@ -168,7 +168,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             # train with unlabeled data
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
             pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
-            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion)
+            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion,device)
             total_loss = [x + lamda * y for x, y in zip(llost_list, ulost_list)]
 
             for idx in range(len(optimizers)):
