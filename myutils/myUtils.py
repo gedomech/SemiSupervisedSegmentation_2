@@ -280,3 +280,12 @@ def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, paddi
             writer.add_image('SegNet Predictions', pred_grid, c_epoch)  # Tensor
 
     writer.close()
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
