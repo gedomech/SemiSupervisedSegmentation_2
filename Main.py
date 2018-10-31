@@ -320,14 +320,14 @@ if __name__ == "__main__":
         pre_train()
     elif args.baseline:
         # Baseline Training Stage
-        baseline_file = open('baseline_31102018.csv', 'w')
+        baseline_file = open('output_baseline_31102018.csv', 'w')
         baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
         baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
         baseline_writer.writeheader()
         train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
     elif args.ensemble:
         # Baseline Training Stage
-        ensemble_file = open('ensemble_31102018.csv', 'w')
+        ensemble_file = open('output_ensemble_31102018.csv', 'w')
         ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
         ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
         ensemble_writer.writeheader()
