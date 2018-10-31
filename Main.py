@@ -26,9 +26,9 @@ lr = 1e-4
 weigth_decay = 1e-6
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-number_workers = 4
-labeled_batch_size = 4
-unlabeled_batch_size = 4
+number_workers = 2
+labeled_batch_size = 2
+unlabeled_batch_size = 2
 val_batch_size = 1
 
 max_epoch_pre = 100
