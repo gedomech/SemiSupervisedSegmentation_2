@@ -200,7 +200,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
                 epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
 
-        score_meters, ensemble_score = test(nets, test_data, device=device)
+        score_meters, ensemble_score = test(nets_, test_data, device=device)
 
         # print(
         #     'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
@@ -220,7 +220,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 score_meters[1].value()[0],
                 ensemble_score.value()[0]))
 
-        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+        historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
 
@@ -234,10 +234,10 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
 
     nets_path = ['checkpoint/best_ENet_ensemble.pth',
-                 'checkpoint/best_UNet_ensemble.pth',
+                 # 'checkpoint/best_UNet_ensemble.pth',
                  'checkpoint/best_SegNet_ensemble.pth']
 
-    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+    dice_meters = [AverageValueMeter(), AverageValueMeter()]#, AverageValueMeter()]
 
     for epoch in range(max_epoch_ensemble):
         print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
@@ -263,8 +263,8 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 total_loss[idx].backward(retain_graph=True)
                 optim.step()
 
-        score_meters, ensemble_score = test(nets, test_data, device=device)
-        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+        score_meters, ensemble_score = test(nets_, test_data, device=device)
+        historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['jsd']:
             historical_score_dict['jsd'] = ensemble_score.value()[0]
 
@@ -272,12 +272,12 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 if __name__ == "__main__":
     # Pre-training Stage
     #pre_train()
-    # print("Baseline Training Stage")
+
     # Baseline Training Stage
-    nets_path = ['checkpoint/best_ENet_pre-trained.pth',
+    nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
                  #'checkpoint/best_UNet_pre-trained.pth',
                  'checkpoint/best_SegNet_pre-trained.pth']
-    # print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
-    train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
-    # train_ensemble()
+    # train_baseline(nets, nets_path_, labeled_data, unlabeled_data)
+
+    train_ensemble(nets, nets_path_, labeled_data, unlabeled_data)
