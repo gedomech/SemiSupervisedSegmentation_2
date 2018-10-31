@@ -91,19 +91,19 @@ def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dic
 
     for idx, net_i in enumerate(nets_):
 
-        if (idx == 0) and ( history_score_dict['enet'] <score_meters[idx].value()[0]):
+        if (idx == 0) and ( history_score_dict['enet'] < score_meters[idx].value()[0]):
             history_score_dict['enet'] = score_meters[idx].value()[0]
-            # print('The highest dice score for ENet is {:.3f} in the test'.format(highest_dice_enet))
+            print('The highest dice score for ENet is {:.3f} in the test'.format(history_score_dict['enet']))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 1) and (history_score_dict['unet'] < score_meters[idx].value()[0]):
             history_score_dict['unet'] = score_meters[idx].value()[0]
-            # print('The highest dice score for UNet is {:.3f} in the test'.format(highest_dice_unet))
+            print('The highest dice score for UNet is {:.3f} in the test'.format(history_score_dict['unet']))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 2) and (history_score_dict['segnet'] < score_meters[idx].value()[0]):
             history_score_dict['segnet']= score_meters[idx].value()[0]
-            # print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
+            print('The highest dice score for SegNet is {:.3f} in the test'.format(history_score_dict['segnet']))
             torch.save(net_i.state_dict(), nets_path_[idx])
     return history_score_dict
 
@@ -123,8 +123,6 @@ class Colorize:
         except:
             color_image = torch.ByteTensor(3, size[0], size[1]).fill_(0)
 
-
-
         for label in range(1, len(self.cmap)):
             mask = gray_image.squeeze() == label
             try:
@@ -134,6 +132,7 @@ class Colorize:
             except:
                 print('error in colorize.')
         return color_image
+
 
 def showImages(board,image_batch, mask_batch,segment_batch):
     color_transform = Colorize()
@@ -145,7 +144,6 @@ def showImages(board,image_batch, mask_batch,segment_batch):
         for i in range(3):
             image_batch[:,i,:,:]=(image_batch[:,i,:,:])*stds[i]+means[i]
 
-
     board.image(image_batch[0], 'original image')
     board.image(color_transform(mask_batch[0]), 'ground truth image')
     board.image(color_transform(segment_batch[0]), 'prediction given by the net')
@@ -155,6 +153,7 @@ def learning_rate_decay(optims, factor=0.95):
     for opti_i in optims:
         for param_group in opti_i.param_groups:
             param_group['lr'] = param_group['lr'] * factor
+
 
 def map_(func,*list):
     return [*map(func,*list)]
@@ -214,7 +213,7 @@ def test(nets_,  test_loader_,device, **kwargs):
     return [dice_meters_test[idx] for idx in range(len(nets_))], mv_dice_score_meter
 
 
-def get_mv_based_labels(imgs,nets):
+def get_mv_based_labels(imgs, nets):
     class_number =2
     prediction = []
     distributions = torch.zeros([imgs.shape[0], class_number, imgs.shape[2], imgs.shape[3]]).to(imgs.dtype)
@@ -226,7 +225,7 @@ def get_mv_based_labels(imgs,nets):
     return pred2segmentation(distributions), prediction
 
 
-def cotraining(prediction, pseudolabel,nets,criterion,device):
+def cotraining(prediction, pseudolabel, nets,criterion, device):
     loss = []
     for idx, net_i in enumerate(nets):
         unlabled_loss = criterion(prediction[idx], pseudolabel.to(device))
@@ -261,7 +260,6 @@ def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, paddi
     :param pad_value:
     :return:
     """
-
     n_samples = np.min([image_set.shape[0], n_images])
 
     if randomly:
@@ -282,4 +280,3 @@ def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, paddi
             writer.add_image('SegNet Predictions', pred_grid, c_epoch)  # Tensor
 
     writer.close()
-
