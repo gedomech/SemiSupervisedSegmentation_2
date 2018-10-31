@@ -226,10 +226,10 @@ def get_mv_based_labels(imgs,nets):
     return pred2segmentation(distributions), prediction
 
 
-def cotraining(prediction, pseudolabel,nets,criterion,device):
+def cotraining(prediction, pseudolabel,nets,criterion):
     loss = []
     for idx, net_i in enumerate(nets):
-        unlabled_loss = criterion(prediction[idx], pseudolabel.to(device))
+        unlabled_loss = criterion(prediction[idx], pseudolabel)
         loss.append(unlabled_loss)
     return loss
 
@@ -279,5 +279,21 @@ def visualize(writer, nets_, image_set, n_images, c_epoch, randomly=True,  nrow=
             writer.add_image('Unet Predictions', pred_grid, c_epoch)  # Tensor
         else:
             writer.add_image('SegNet Predictions', pred_grid, c_epoch)  # Tensor
+
+
+import time
+def s_forward_backward(net,optim, imgs, masks, criterion):
+
+    now = time.time()
+    optim.zero_grad()
+    pred = net(imgs)
+    loss = criterion(pred, masks.squeeze(1))
+    loss.backward()
+    optim.step()
+    dice_score = dice_loss(pred2segmentation(pred), masks.squeeze(1))
+
+    return dice_score
+
+
 
 

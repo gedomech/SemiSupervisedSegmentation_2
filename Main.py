@@ -15,22 +15,24 @@ from myutils.myUtils import *
 warnings.filterwarnings('ignore')
 writer = SummaryWriter()
 
-# torch.set_num_threads(3)  # set by deafault to 1
+# torch.set_num_threads(1)  # set by deafault to 1
 root = "datasets/ISIC2018"
 writer = SummaryWriter()
 
 
 class_number = 2
-lr = 1e-4
+lr = 1e-6
 weigth_decay = 1e-6
+lamda = 1e-1
+
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 number_workers = 0
 labeled_batch_size = 2
-unlabeled_batch_size = 1
+unlabeled_batch_size = 2
 val_batch_size = 1
 
-max_epoch_pre = 100
+max_epoch_pre = 1
 max_epoch_baseline = 1
 max_epoch_ensemble = 100
 train_print_frequncy = 10
@@ -64,8 +66,6 @@ nets = [Enet(class_number),
         UNet(class_number),
         SegNet(class_number)]
 
-# for i, net_i in enumerate(nets):
-#     nets[i] = net_i.to(device)
 nets = map_(lambda x: x.to(device), nets)
 
 map_location = lambda storage, loc: storage
@@ -102,23 +102,24 @@ def pre_train():
                  'checkpoint/best_SegNet_pre-trained.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
+    import time
+    from multiprocessing import Pool
+    time_begin = time.time()
     for epoch in range(max_epoch_pre):
         map_(lambda x: x.reset(), dice_meters)
+
 
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
+            from functools import partial
+            p_forward = partial(s_forward_backward,imgs=img,masks=mask,criterion=criterion)
 
-            for idx, net_i in enumerate(nets):
-                optimizers[idx].zero_grad()
-                pred = nets[idx](img)
-                loss = criterion(pred, mask.squeeze(1))
-                loss.backward()
-                optimizers[idx].step()
-                dice_score = dice_loss(pred2segmentation(pred), mask.squeeze(1))
-                dice_meters[idx].add(dice_score)
+            dices=list(Pool().starmap(p_forward,zip(nets,optimizers)))
+            map_(lambda x,y:x.add(y),dice_meters,dices)
+
 
         print(
             'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
@@ -126,8 +127,6 @@ def pre_train():
                 dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
         score_meters, ensemble_score = test(nets, test_data, device=device)
-
-        #visualize(nets, dataset, number_of_images)
 
         print(
             'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(
@@ -139,8 +138,6 @@ def pre_train():
                 ensemble_score.value()[0]))
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
 
-    # train_baseline(nets, nets_path, labeled_data, unlabeled_data)
-    # train_ensemble(nets, nets_path, labeled_data, unlabeled_data )
 
 
 def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
@@ -159,11 +156,11 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
 
-        if epoch % 5 == 0:
-            learning_rate_decay(optimizers, 0.95)
+        # if epoch % 5 == 0:
+        #     learning_rate_decay(optimizers, 0.95)
         
         # train with labeled data
-        for _ in tqdm(range(1)):
+        for _ in tqdm(range(len(unlabeled_loader_))):
 
             imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
@@ -171,8 +168,8 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             # train with unlabeled data
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
             pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
-            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion, device=device)
-            total_loss = [x + y for x, y in zip(llost_list, ulost_list)]
+            ulost_list = cotraining(predictions, pseudolabel, nets_, criterion)
+            total_loss = [x + lamda*y for x, y in zip(llost_list, ulost_list)]
 
             for idx in range(len(optimizers)):
                 optimizers[idx].zero_grad()
@@ -209,7 +206,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     """
 
     global historical_score_dict
-    map_(lambda x, y: [x.load_state_dict(torch.load(y)), x.train()], nets_, nets_path_)
+    map_(lambda x, y: [x.load_state_dict(torch.load(y,map_location='cpu')), x.train()], nets_, nets_path_)
 
     nets_path = ['checkpoint/best_ENet_ensemble.pth',
                  'checkpoint/best_UNet_ensemble.pth',
@@ -222,8 +219,8 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
 
-        if epoch % 5 == 0:
-            learning_rate_decay(optimizers, 0.95)
+        # if epoch % 5 == 0:
+        #     learning_rate_decay(optimizers, 0.95)
 
         for _ in tqdm(range(2)): #max(len(labeled_loader_), len(unlabeled_loader_)
             # === train with labeled data ===
@@ -249,7 +246,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 
 if __name__ == "__main__":
     # Pre-training Stage
-    #pre_train()
+    # pre_train()
     # print("Baseline Training Stage")
     # Baseline Training Stage
     nets_path = ['checkpoint/best_ENet_pre-trained.pth',
@@ -258,4 +255,3 @@ if __name__ == "__main__":
     # print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
 
-    # train_ensemble()
