@@ -237,7 +237,7 @@ def get_loss(predictions):
     p = torch.cat(predictions)
     criteron = JensenShannonDivergence()
     loss = criteron(p)
-    loss.requires_grad = False
+    # loss.requires_grad = False
     return loss
 
 
