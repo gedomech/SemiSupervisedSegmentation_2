@@ -12,6 +12,9 @@ import warnings
 from tqdm import tqdm
 from myutils.myUtils import *
 
+import csv
+import argparse
+
 warnings.filterwarnings('ignore')
 writer = SummaryWriter()
 
@@ -154,7 +157,7 @@ def pre_train():
     # train_ensemble(nets, nets_path, labeled_data, unlabeled_data )
 
 
-def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
+def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_writer):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
@@ -200,6 +203,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
                 epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
 
+
         score_meters, ensemble_score = test(nets_, test_data, device=device)
 
         # print(
@@ -219,13 +223,17 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 score_meters[0].value()[0],
                 score_meters[1].value()[0],
                 ensemble_score.value()[0]))
+        cvs_writer.writerow({'Epoch': epoch + 1,
+                             'ENet_Score': score_meters[0].value()[0],
+                             'SegNet_Score': score_meters[1].value()[0],
+                             'MV_Score': ensemble_score.value()[0]})
 
         historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
 
 
-def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
+def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_writer):
     """
     train_ensemble function performs the ensemble training with the unlabeled subset.
     """
@@ -262,22 +270,65 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
                 optim.zero_grad()
                 total_loss[idx].backward(retain_graph=True)
                 optim.step()
+                dice_meters[idx].add(dice_score[idx])
+
+        print(
+            'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
+                epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
 
         score_meters, ensemble_score = test(nets_, test_data, device=device)
+
+        print(
+            'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
+                epoch + 1,
+                max_epoch_pre,
+                score_meters[0].value()[0],
+                score_meters[1].value()[0],
+                ensemble_score.value()[0]))
+
+        cvs_writer.writerow({'Epoch': epoch + 1,
+                             'ENet_Score': score_meters[0].value()[0],
+                             'SegNet_Score': score_meters[1].value()[0],
+                             'MV_Score': ensemble_score.value()[0]})
+
         historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['jsd']:
             historical_score_dict['jsd'] = ensemble_score.value()[0]
 
 
 if __name__ == "__main__":
-    # Pre-training Stage
-    #pre_train()
+    PRE_TRAINING = False
+    BASELINE = False
+    ENSEMBLE = False
 
-    # Baseline Training Stage
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pre-training", type=str2bool, nargs='?', const=False, default=PRE_TRAINING,
+                        help="Whether to pre-train the models.")
+    parser.add_argument("--baseline", type=str2bool, nargs='?', const=False, default=BASELINE,
+                        help="Whether to train the baseline models.")
+    parser.add_argument("--ensemble", type=str2bool, nargs='?', const=False, default=ENSEMBLE,
+                        help="Whether to train the ensemble models.")
+
+    args = parser.parse_args()
+
     nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
-                 #'checkpoint/best_UNet_pre-trained.pth',
-                 'checkpoint/best_SegNet_pre-trained.pth']
+                  # 'checkpoint/best_UNet_pre-trained.pth',
+                  'checkpoint/best_SegNet_pre-trained.pth']
 
-    # train_baseline(nets, nets_path_, labeled_data, unlabeled_data)
-
-    train_ensemble(nets, nets_path_, labeled_data, unlabeled_data)
+    if args.pre_training:
+        # Pre-training Stage
+        pre_train()
+    elif args.baseline:
+        # Baseline Training Stage
+        baseline_file = open('baseline_31102018.csv', 'w')
+        baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
+        baseline_writer.writeheader()
+        train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
+    elif args.ensemble:
+        # Baseline Training Stage
+        ensemble_file = open('ensemble_31102018.csv', 'w')
+        ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
+        ensemble_writer.writeheader()
+        train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
