@@ -1,6 +1,6 @@
 import os
 import sys
-
+import pandas as pd
 from tensorboardX import SummaryWriter
 
 sys.path.extend([os.path.dirname(os.getcwd())])
@@ -19,11 +19,10 @@ writer = SummaryWriter()
 root = "datasets/ISIC2018"
 writer = SummaryWriter()
 
-
 class_number = 2
 lr = 1e-6
 weigth_decay = 1e-6
-lamda = 1e-1
+lamda = 5e-2
 
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
@@ -82,11 +81,15 @@ criterion = CrossEntropyLoss2d(class_weigth).to(device) if (
     class_weigth)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 
-historical_score_dict = {'enet': 0,
-                         'unet': 0,
-                         'segnet': 0,
-                         'mv': 0,
-                         'jsd': 0}
+historical_score_dict = {
+    'epoch': -1,
+    'enet': 0,
+    'unet': 0,
+    'segnet': 0,
+    'mv': 0,
+    'jsd': 0}
+
+from functools import partial
 
 
 def pre_train():
@@ -104,22 +107,19 @@ def pre_train():
 
     import time
     from multiprocessing import Pool
-    time_begin = time.time()
+
     for epoch in range(max_epoch_pre):
         map_(lambda x: x.reset(), dice_meters)
-
 
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
-            from functools import partial
-            p_forward = partial(s_forward_backward,imgs=img,masks=mask,criterion=criterion)
 
-            dices=list(Pool().starmap(p_forward,zip(nets,optimizers)))
-            map_(lambda x,y:x.add(y),dice_meters,dices)
-
+            p_forward = partial(s_forward_backward, imgs=img, masks=mask, criterion=criterion)
+            dices = list(Pool().starmap(p_forward, zip(nets, optimizers)))
+            map_(lambda x, y: x.add(y), dice_meters, dices)
 
         print(
             'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
@@ -139,14 +139,14 @@ def pre_train():
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
 
 
-
 def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
+    records =[]
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
     #  loading pre-trained models
 
-    map_(lambda x, y: [x.load_state_dict(torch.load(y,map_location='cpu')), x.train()], nets_, nets_path_)
+    map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
     global historical_score_dict
     nets_path = ['checkpoint/best_ENet_baseline.pth',
                  'checkpoint/best_UNet_baseline.pth',
@@ -158,9 +158,9 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
 
         # if epoch % 5 == 0:
         #     learning_rate_decay(optimizers, 0.95)
-        
+
         # train with labeled data
-        for _ in tqdm(range(len(unlabeled_loader_))):
+        for _ in tqdm(range(len(unlabeled_loader_))): #
 
             imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
@@ -169,7 +169,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
             pseudolabel, predictions = get_mv_based_labels(imgs, nets_)
             ulost_list = cotraining(predictions, pseudolabel, nets_, criterion)
-            total_loss = [x + lamda*y for x, y in zip(llost_list, ulost_list)]
+            total_loss = [x + lamda * y for x, y in zip(llost_list, ulost_list)]
 
             for idx in range(len(optimizers)):
                 optimizers[idx].zero_grad()
@@ -197,7 +197,14 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
 
-        visualize(writer,nets_,unlabeled_loader_,8,epoch,randomly=False)
+        records.append(historical_score_dict)
+
+        try:
+            pd.DataFrame(records).to_csv('baselinerecords.csv')
+        except Exception as e:
+            print(e)
+
+        visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
 
 
 def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
@@ -206,7 +213,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
     """
 
     global historical_score_dict
-    map_(lambda x, y: [x.load_state_dict(torch.load(y,map_location='cpu')), x.train()], nets_, nets_path_)
+    map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
 
     nets_path = ['checkpoint/best_ENet_ensemble.pth',
                  'checkpoint/best_UNet_ensemble.pth',
@@ -222,7 +229,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         # if epoch % 5 == 0:
         #     learning_rate_decay(optimizers, 0.95)
 
-        for _ in tqdm(range(2)): #max(len(labeled_loader_), len(unlabeled_loader_)
+        for _ in tqdm(range(2)):  # max(len(labeled_loader_), len(unlabeled_loader_)
             # === train with labeled data ===
             imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
@@ -254,4 +261,3 @@ if __name__ == "__main__":
                  'checkpoint/best_SegNet_pre-trained.pth']
     # print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
     train_baseline(nets, nets_path, labeled_data, unlabeled_data)
-

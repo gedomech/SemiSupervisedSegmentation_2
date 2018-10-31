@@ -88,6 +88,7 @@ def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dic
     :param epoch: epoch which was obtained the scores
     :return:
     """
+    history_score_dict['epoch']=epoch
 
     for idx, net_i in enumerate(nets_):
 
@@ -105,6 +106,8 @@ def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dic
             history_score_dict['segnet']= score_meters[idx].value()[0]
             # print('The highest dice score for SegNet is {:.3f} in the test'.format(highest_dice_segnet))
             torch.save(net_i.state_dict(), nets_path_[idx])
+
+
     return history_score_dict
 
 
