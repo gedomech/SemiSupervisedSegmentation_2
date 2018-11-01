@@ -25,6 +25,8 @@ writer = SummaryWriter()
 class_number = 2
 lr = 1e-4
 weigth_decay = 1e-6
+lamda = 5e-2
+
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 number_workers = 0
@@ -62,17 +64,19 @@ unlabeled_data = DataLoader(unlabeled_data, **unlabeled_loader_params)
 test_data = DataLoader(test_data, **unlabeled_loader_params)
 
 ## networks and optimisers
-nets = [Enet(class_number),
-        #UNet(class_number),
-        SegNet(class_number)]
+# nets = [Enet(class_number),
+#         #UNet(class_number),
+#         SegNet(class_number)]
+
+nets = 3*[SegNet(class_number)]
 
 nets = map_(lambda x: x.to(device), nets)
 
 map_location = lambda storage, loc: storage
 
 optimizers = [torch.optim.Adam(nets[0].parameters(), lr=lr, weight_decay=weigth_decay),
-              torch.optim.Adam(nets[1].parameters(), lr=lr, weight_decay=weigth_decay)]#,
-              # torch.optim.Adam(nets[2].parameters(), lr=lr, weight_decay=weigth_decay)]
+              torch.optim.Adam(nets[1].parameters(), lr=lr, weight_decay=weigth_decay),
+              torch.optim.Adam(nets[2].parameters(), lr=lr, weight_decay=weigth_decay)]
 
 ## loss
 class_weigth = [1 * 0.1, 3.53]
@@ -82,11 +86,19 @@ criterion = CrossEntropyLoss2d(class_weigth).to(device) if (
     class_weigth)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 
+# historical_score_dict = {
+#     'epoch': -1,
+#     'enet': 0,
+#     'unet': 0,
+#     'segnet': 0,
+#     'mv': 0,
+#     'jsd': 0}
+
 historical_score_dict = {
     'epoch': -1,
-    'enet': 0,
-    'unet': 0,
-    'segnet': 0,
+    'segnet1': 0,
+    'segnet2': 0,
+    'segnet3': 0,
     'mv': 0,
     'jsd': 0}
 
@@ -102,11 +114,10 @@ def pre_train():
     global historical_score_dict
 
     nets_path = ['checkpoint/best_ENet_pre-trained.pth',
-                 #'checkpoint/best_UNet_pre-trained.pth',
+                 'checkpoint/best_UNet_pre-trained.pth',
                  'checkpoint/best_SegNet_pre-trained.pth']
-    dice_meters = [AverageValueMeter(), AverageValueMeter()]#, AverageValueMeter()]
+    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
-    import time
     from multiprocessing import Pool
 
     for epoch in range(max_epoch_pre):
@@ -122,41 +133,25 @@ def pre_train():
             dices = list(Pool().starmap(p_forward, zip(nets, optimizers)))
             map_(lambda x, y: x.add(y), dice_meters, dices)
 
-        # print(
-        #     'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
-        #         epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-        #         dice_meters[1].value()[0], dice_meters[2].value()[0]))
-        # without Unet
         print(
-            'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.3f}, segnet_dice_score: {3:.3f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
+            'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
+                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+                dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
         score_meters, ensemble_score = test(nets, test_data, device=device)
 
-        #visualize(nets, dataset, number_of_images)
-
-        # print(
-        #     'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(
-        #         epoch + 1,
-        #         max_epoch_pre,
-        #         score_meters[0].value()[0],
-        #         score_meters[1].value()[0],
-        #         score_meters[2].value()[0],
-        #         ensemble_score.value()[0]))
-
-        # without Unet
         print(
-            'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.3f}, segnet_dice_score: {3:.3f}, with majorty voting: {4:.3f}'.format(
+            'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(
                 epoch + 1,
                 max_epoch_pre,
                 score_meters[0].value()[0],
                 score_meters[1].value()[0],
                 score_meters[2].value()[0],
                 ensemble_score.value()[0]))
+
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
 
-    # train_baseline(nets, nets_path, labeled_data, unlabeled_data)
-    # train_ensemble(nets, nets_path, labeled_data, unlabeled_data )
+        # visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
 
 
 def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_writer):
@@ -165,13 +160,15 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
     #  loading pre-trained models
-
     map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
     global historical_score_dict
-    nets_path = ['checkpoint/best_ENet_baseline.pth',
-                 # 'checkpoint/best_UNet_baseline.pth',
-                 'checkpoint/best_SegNet_baseline.pth']
-    dice_meters = [AverageValueMeter(), AverageValueMeter()]#, AverageValueMeter()]
+    # nets_path = ['checkpoint/best_ENet_baseline.pth',
+    #              # 'checkpoint/best_UNet_baseline.pth',
+    #              'checkpoint/best_SegNet_baseline.pth']
+    nets_path = ['checkpoint/best_SegNet1_pre-trained.pth',
+                 'checkpoint/best_SegNet2_pre-trained.pth',
+                 'checkpoint/best_SegNet3_pre-trained.pth']
+    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
@@ -180,7 +177,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
         #     learning_rate_decay(optimizers, 0.95)
 
         # train with labeled data
-        for _ in tqdm(range(len(unlabeled_loader_))): #
+        for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))): #
 
             imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
@@ -197,50 +194,58 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                 optimizers[idx].step()
                 dice_meters[idx].add(dice_score[idx])
 
-        # print(
-        #     'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}'.format(
-        #         epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-        #         dice_meters[1].value()[0], dice_meters[2].value()[0]))
-
-        # without Unet
         print(
-            'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
+            'train epoch {0:1d}/{1:d} baseline: segnet1_dice_score={2:.3f}, segnet2_dice_score={3:.3f}, segnet3_dice_score={4:.3f}'.format(
+                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+                dice_meters[1].value()[0], dice_meters[2].value()[0]))
+
+        # # without Unet
+        # print(
+        #     'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
+        #         epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
 
         score_meters, ensemble_score = test(nets_, test_data, device=device)
 
-        # print(
-        #     'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, unet_dice_score={3:.3f}, segnet_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
-        #         epoch + 1,
-        #         max_epoch_pre,
-        #         score_meters[0].value()[0],
-        #         score_meters[1].value()[0],
-        #         score_meters[2].value()[0],
-        #         ensemble_score.value()[0]))
+        # add performance of nets to plot
+        nets_score_dict = {"Segnet1": score_meters[0].value()[0],
+                           "Segnet2": score_meters[0].value()[0],
+                           "Segnet3": score_meters[0].value()[0],
+                           "MajVote": ensemble_score[0].value()[0]}
+        add_visual_perform(writer, nets_score_dict, epoch+1)
 
-        # without Unet
         print(
-            'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
+            'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.3f}, segnet2_dice_score={3:.3f}, segnet3_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
                 epoch + 1,
                 max_epoch_pre,
                 score_meters[0].value()[0],
                 score_meters[1].value()[0],
+                score_meters[2].value()[0],
                 ensemble_score.value()[0]))
+
+        # # without Unet
+        # print(
+        #     'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
+        #         epoch + 1,
+        #         max_epoch_pre,
+        #         score_meters[0].value()[0],
+        #         score_meters[1].value()[0],
+        #         ensemble_score.value()[0]))
         cvs_writer.writerow({'Epoch': epoch + 1,
-                             'ENet_Score': score_meters[0].value()[0],
-                             'SegNet_Score': score_meters[1].value()[0],
+                             'SegNet1_Score': score_meters[0].value()[0],
+                             'SegNet2_Score': score_meters[1].value()[0],
+                             'SegNet3_Score': score_meters[2].value()[0],
                              'MV_Score': ensemble_score.value()[0]})
 
         historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
 
-        records.append(historical_score_dict)
+            records.append(historical_score_dict)
 
-        try:
-            pd.DataFrame(records).to_csv('baselinerecords.csv')
-        except Exception as e:
-            print(e)
+            try:
+                pd.DataFrame(records).to_csv('baseline_records_segnet_ens.csv')
+            except Exception as e:
+                print(e)
 
         # visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
 
@@ -253,11 +258,14 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
     global historical_score_dict
     map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
 
-    nets_path = ['checkpoint/best_ENet_ensemble.pth',
-                 # 'checkpoint/best_UNet_ensemble.pth',
-                 'checkpoint/best_SegNet_ensemble.pth']
+    # nets_path = ['checkpoint/best_ENet_ensemble.pth',
+    #              # 'checkpoint/best_UNet_ensemble.pth',
+    #              'checkpoint/best_SegNet_ensemble.pth']
+    nets_path = ['checkpoint/best_SegNet1_pre-trained.pth',
+                 'checkpoint/best_SegNet2_pre-trained.pth',
+                 'checkpoint/best_SegNet3_pre-trained.pth']
 
-    dice_meters = [AverageValueMeter(), AverageValueMeter()]#, AverageValueMeter()]
+    dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     for epoch in range(max_epoch_ensemble):
         print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
@@ -286,9 +294,19 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
 
         print(
             'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
+                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+                dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
         score_meters, ensemble_score = test(nets_, test_data, device=device)
+
+        print(
+            'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.3f}, segnet2_dice_score={3:.3f}, segnet3_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
+                epoch + 1,
+                max_epoch_pre,
+                score_meters[0].value()[0],
+                score_meters[1].value()[0],
+                score_meters[2].value()[0],
+                ensemble_score.value()[0]))
 
         print(
             'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
@@ -332,9 +350,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
-                  # 'checkpoint/best_UNet_pre-trained.pth',
-                  'checkpoint/best_SegNet_pre-trained.pth']
+    # nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
+    #               # 'checkpoint/best_UNet_pre-trained.pth',
+    #               'checkpoint/best_SegNet_pre-trained.pth']
+    nets_path_ = 3*['checkpoint/best_SegNet_pre-trained.pth']
 
     if args.pre_training:
         # Pre-training Stage
