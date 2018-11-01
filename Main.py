@@ -202,7 +202,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
         nets_score_dict = {"Segnet1": score_meters[0].value()[0],
                            "Segnet2": score_meters[0].value()[0],
                            "Segnet3": score_meters[0].value()[0],
-                           "MajVote": ensemble_score[0].value()[0]}
+                           "MajVote": ensemble_score.value()[0]}
         add_visual_perform(writer, nets_score_dict, epoch+1)
 
         print(
