@@ -97,19 +97,21 @@ def save_models(nets_, nets_path_, nets_names, score_meters=None, epoch=0, histo
 
         if (idx == 0) and ( history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
             history_score_dict[nets_names[idx]] = score_meters[idx].value()[0]
-            print('The highest dice score for ENet is {:.3f} in the test'.format(history_score_dict['enet']))
+            print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
+                                                                               history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 1) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
             history_score_dict[nets_names[idx]] = score_meters[idx].value()[0]
-            print('The highest dice score for UNet is {:.3f} in the test'.format(history_score_dict['unet']))
+            print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
+                                                                               history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 2) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
             history_score_dict[nets_names[idx]]= score_meters[idx].value()[0]
-            print('The highest dice score for SegNet is {:.3f} in the test'.format(history_score_dict['segnet']))
+            print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
+                                                                               history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
-
 
     return history_score_dict
 
