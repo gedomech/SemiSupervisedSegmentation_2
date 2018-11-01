@@ -23,7 +23,7 @@ root = "datasets/ISIC2018"
 writer = SummaryWriter()
 
 class_number = 2
-lr = 1e-4
+lr = 1e-5
 weigth_decay = 1e-6
 lamda = 5e-2
 
@@ -162,12 +162,9 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
     #  loading pre-trained models
     map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
     global historical_score_dict
-    # nets_path = ['checkpoint/best_ENet_baseline.pth',
-    #              # 'checkpoint/best_UNet_baseline.pth',
-    #              'checkpoint/best_SegNet_baseline.pth']
-    nets_path = ['checkpoint/best_SegNet1_pre-trained.pth',
-                 'checkpoint/best_SegNet2_pre-trained.pth',
-                 'checkpoint/best_SegNet3_pre-trained.pth']
+    nets_path = ['checkpoint/best_SegNet1_baseline.pth',
+                 'checkpoint/best_SegNet2_baseline.pth',
+                 'checkpoint/best_SegNet3_baseline.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
@@ -199,11 +196,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                 epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
                 dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
-        # # without Unet
-        # print(
-        #     'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
-        #         epoch + 1, max_epoch_pre, dice_meters[0].value()[0], dice_meters[1].value()[0]))
-
         score_meters, ensemble_score = test(nets_, test_data, device=device)
 
         # add performance of nets to plot
@@ -222,14 +214,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                 score_meters[2].value()[0],
                 ensemble_score.value()[0]))
 
-        # # without Unet
-        # print(
-        #     'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
-        #         epoch + 1,
-        #         max_epoch_pre,
-        #         score_meters[0].value()[0],
-        #         score_meters[1].value()[0],
-        #         ensemble_score.value()[0]))
         cvs_writer.writerow({'Epoch': epoch + 1,
                              'SegNet1_Score': score_meters[0].value()[0],
                              'SegNet2_Score': score_meters[1].value()[0],
@@ -362,8 +346,9 @@ if __name__ == "__main__":
     elif args.baseline:
         # Baseline Training Stage
         print('STARTING THE BASELINE TRAINING STAGE')
-        baseline_file = open('output_baseline_31102018.csv', 'w')
-        baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        baseline_file = open('output_baseline_01112018_Segnet.csv', 'w')
+        # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
         baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
         baseline_writer.writeheader()
         train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
