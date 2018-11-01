@@ -80,7 +80,7 @@ def image_batch_generator(dataset=None, device=torch.device):
     return img.to(device), mask.to(device), paths
 
 
-def save_models(nets_, nets_path_, nets_names, score_meters=None, epoch=0, history_score_dict=None, ):
+def save_models(nets_, nets_path_, nets_names, score_meters=None, epoch=0, history_score_dict={}):
     """
     This function saves the parameters of the nets
     :param nets_: networks containing the parameters to be saved
