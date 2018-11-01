@@ -324,16 +324,16 @@ if __name__ == "__main__":
     elif args.baseline:
         # Baseline Training Stage
         print('STARTING THE BASELINE TRAINING STAGE')
-        baseline_file = open('output_baseline_31102018.csv', 'w')
-        baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-        baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
-        baseline_writer.writeheader()
-        train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
+        # baseline_file = open('output_baseline_31102018.csv', 'w')
+        # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        # baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
+        # baseline_writer.writeheader()
+        train_baseline(nets, nets_path_, labeled_data, unlabeled_data)
     elif args.ensemble:
         # Ensemble Training Stage
         print('STARTING THE ENSEMBLE TRAINING STAGE')
-        ensemble_file = open('output_ensemble_31102018.csv', 'w')
-        ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-        ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
-        ensemble_writer.writeheader()
-        train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
+        # ensemble_file = open('output_ensemble_31102018.csv', 'w')
+        # ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        # ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
+        # ensemble_writer.writeheader()
+        train_ensemble(nets, nets_path_, labeled_data, unlabeled_data)
