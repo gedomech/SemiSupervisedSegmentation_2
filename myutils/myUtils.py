@@ -288,7 +288,6 @@ def add_visual_perform(writer: SummaryWriter, score_meters: dict, c_epoch):
     writer.add_scalars('data/performance_plot', score_meters, c_epoch)
 
 
-
 import time
 def s_forward_backward(net,optim, imgs, masks, criterion):
 
