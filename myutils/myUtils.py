@@ -80,31 +80,33 @@ def image_batch_generator(dataset=None, device=torch.device):
     return img.to(device), mask.to(device), paths
 
 
-def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dict=None, ):
+def save_models(nets_, nets_path_, nets_names, score_meters=None, epoch=0, history_score_dict=None, ):
     """
     This function saves the parameters of the nets
     :param nets_: networks containing the parameters to be saved
     :param nets_path_: list of path where each net will be saved
+    :param nets_names: list of names to recovery nets from dictionary
     :param score_meters: list of torchnet.meter.AverageValueMeter objects corresponding with each net
     :param epoch: epoch which was obtained the scores
+    :param history_score_dict:
     :return:
     """
     history_score_dict['epoch']=epoch
 
     for idx, net_i in enumerate(nets_):
 
-        if (idx == 0) and ( history_score_dict['enet'] < score_meters[idx].value()[0]):
-            history_score_dict['enet'] = score_meters[idx].value()[0]
+        if (idx == 0) and ( history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
+            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0]
             print('The highest dice score for ENet is {:.3f} in the test'.format(history_score_dict['enet']))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
-        elif (idx == 1) and (history_score_dict['unet'] < score_meters[idx].value()[0]):
-            history_score_dict['unet'] = score_meters[idx].value()[0]
+        elif (idx == 1) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
+            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0]
             print('The highest dice score for UNet is {:.3f} in the test'.format(history_score_dict['unet']))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
-        elif (idx == 2) and (history_score_dict['segnet'] < score_meters[idx].value()[0]):
-            history_score_dict['segnet']= score_meters[idx].value()[0]
+        elif (idx == 2) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
+            history_score_dict[nets_names[idx]]= score_meters[idx].value()[0]
             print('The highest dice score for SegNet is {:.3f} in the test'.format(history_score_dict['segnet']))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
