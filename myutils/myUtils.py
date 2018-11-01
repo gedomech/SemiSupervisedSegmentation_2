@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+import argparse
 
 import torchvision.utils as vutils
 from tensorboardX import SummaryWriter
@@ -296,6 +297,15 @@ def s_forward_backward(net,optim, imgs, masks, criterion):
     dice_score = dice_loss(pred2segmentation(pred), masks.squeeze(1))
 
     return dice_score
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 
