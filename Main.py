@@ -218,7 +218,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
         except Exception as e:
             print(e)
 
-        visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
+        # visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
 
 
 def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_):
