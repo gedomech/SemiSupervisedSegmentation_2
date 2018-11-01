@@ -283,6 +283,12 @@ def visualize(writer, nets_, image_set, n_images, c_epoch, randomly=True,  nrow=
             writer.add_image('SegNet Predictions', pred_grid, c_epoch)  # Tensor
 
 
+def add_visual_perform(writer: SummaryWriter, score_meters: dict, c_epoch):
+
+    writer.add_scalars('data/performance_plot', score_meters, c_epoch)
+
+
+
 import time
 def s_forward_backward(net,optim, imgs, masks, criterion):
 
@@ -305,14 +311,3 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-
-
-
-
-def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
