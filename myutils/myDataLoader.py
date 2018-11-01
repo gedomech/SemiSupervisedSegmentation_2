@@ -33,17 +33,18 @@ mask_transform = transforms.Compose([
 ])
 
 class ISICdata(Dataset):
-    def __init__(self,root,model,mode,transform,dataAugment=False,equalize=False):
+    def __init__(self, root, model, mode, transform, img_gts_file=None, dataAugment=False, equalize=False):
         super().__init__()
         self.dataAugment = dataAugment
         self.equalize = equalize
         self.transform = transform
-        assert mode in ('semi','full'), "the mode should be always in 'semi' or 'full', given '%s'."%mode
+        assert mode in ('semi','full', 'customized'), "the mode should be always in 'semi' or 'full', given '%s'."%mode
         self.model = model
         self.mode = mode
         self.root = root
         self.csv_root = os.path.join(root,'ISIC_Segmenation_dataset_split')
-        if self.mode=="full":
+        self.img_gts_file = img_gts_file
+        if self.mode == "full":
             assert model in ('train', 'dev'), "the model should be always in 'train' or 'dev', given '%s'." % model
             if self.model=="train":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'train.csv'))
@@ -51,7 +52,7 @@ class ISICdata(Dataset):
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'val.csv'))
             else:
                 raise NotImplemented
-        elif self.mode=="semi":
+        elif self.mode == "semi":
             assert model in ('labeled', 'unlabeled', 'test'), "the model should be always in 'labeled', 'unlabeled' or 'test', given '%s'." % model
             if self.model=="labeled":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_labeled_tr.csv'))
@@ -59,18 +60,24 @@ class ISICdata(Dataset):
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_unlabeled_tr.csv'))
             elif self.model == "test":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'random_test.csv'))
+        elif self.mode == "customized":
+            try:
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root, self.img_gts_file))
+            except IOError as Exc:
+                print("Unable to open file {}".format(self.img_gts_file))  # Does not exist OR no read permissions
+                raise Exc
 
         self.imgs = img_gts_list['img'].values
         self.gts = img_gts_list['label'].values
-        imgs = [x for x in os.listdir(os.path.join(self.root,'ISIC2018_Task1-2_Training_Input')) if x.find('jpg')>0]
-        gts = [x for x in os.listdir(os.path.join(self.root,'ISIC2018_Task1_Training_GroundTruth')) if x.find('png')>0]
+        imgs = [x for x in os.listdir(os.path.join(self.root, 'ISIC2018_Task1-2_Training_Input')) if x.find('jpg')>0]
+        gts = [x for x in os.listdir(os.path.join(self.root, 'ISIC2018_Task1_Training_GroundTruth')) if x.find('png')>0]
         self.imgs = ['ISIC2018_Task1-2_Training_Input/'+x for x in  self.imgs if x.split('/')[0] in imgs]
-        self.gts = ['ISIC2018_Task1_Training_GroundTruth/'+x.replace(' ','') for x in self.gts if x.split('/')[0].replace('_segmentation.png','.jpg').replace(' ','') in imgs]
+        self.gts = ['ISIC2018_Task1_Training_GroundTruth/'+x.replace(' ', '') for x in self.gts if x.split('/')[0].replace('_segmentation.png','.jpg').replace(' ','') in imgs]
 
         assert len(self.imgs)==len(self.gts)
 
     def __getitem__(self, index):
-        img_path =self.imgs[index]
+        img_path = self.imgs[index]
         gt_path = self.gts[index]
 
         img = Image.open(os.path.join(self.root,img_path)).convert('RGB')
@@ -142,7 +149,7 @@ if __name__ == "__main__":
         root = "/home/guillermo/Documents/ETS_ResearchInternship/ISIC2018paperBaseline/datasets/ISIC2018"
     # ISICdata(root=root,model='dev',transform=None)
     traintset = ISICdata(root=root,model='train',transform=True,equalize=True,dataAugment=True)
-    train_loader = DataLoader(traintset,batch_size=16,num_workers=8)
+    train_loader = DataLoader(traintset,batch_size=16, num_workers=8)
 
     fb_number = AverageValueMeter()
     bg_number = AverageValueMeter()

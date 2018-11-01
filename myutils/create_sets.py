@@ -5,6 +5,7 @@ import shutil
 import errno
 
 import numpy as np
+import pandas as pd
 
 
 # TODO: optimize this function
@@ -39,6 +40,7 @@ def createTrainValSets(root, img_path_list, n_imgs=20, val_portion=0.):
             else:
                 train_file.write("{},{}\n".format(img_name, img_name.replace('.jpg', '_segmentation.png')))
 
+
 def createSemisupervisedSets(root, img_path_list, n_imgs=20, labeled_portion=0.2, test_portion=0.2):
     n_test_imgs = int(math.ceil(n_imgs * test_portion))  # number of images in test set
     n_labeled_imgs = int(math.ceil((n_imgs - n_test_imgs) * labeled_portion))  # number of images in labeled train set
@@ -69,22 +71,42 @@ def createSemisupervisedSets(root, img_path_list, n_imgs=20, labeled_portion=0.2
                 unlabeled_file.write("{},{}\n".format(img_name, img_name.replace('.jpg', '_segmentation.png')))
 
 
+def split_train_set(output_dir, in_csv_file, train_csv_files, n_splits=3):
+    assert len(train_csv_files) == n_splits,\
+        "the number files must corrspond with the given number of splits, {}.".format(n_splits)
+    img_gts_list = pd.read_csv(in_csv_file)
+
+    n_samples = round(len(img_gts_list) / n_splits)
+
+    # print(img_gts_list['img'][:10])
+    for idx in range(n_splits):
+        pd.DataFrame(img_gts_list[idx*n_samples:(idx+1)*n_samples]).to_csv(os.path.join(output_dir, train_csv_files[idx]),
+                                                                           index=False)
+
+
 if __name__ == "__main__":
     root_dir = '/home/guillermo/Documents/InternshipETS/SemiSupervisedSegmentation_2/datasets/ISIC2018'
 
-    img_path_list = listFiles(os.path.join(root_dir, 'ISIC2018_Task1-2_Training_Input'),
-                                                exten='.jpg')
-    np.random.shuffle(img_path_list)
-    n_imgs = len(img_path_list)
-
-    # create train and validation sets
-    #createTrainValSets(root_dir, img_path_list, n_imgs=n_imgs, val_portion=0.2)
-
+    # img_path_list = listFiles(os.path.join(root_dir, 'ISIC2018_Task1-2_Training_Input'),
+    #                                             exten='.jpg')
+    # np.random.shuffle(img_path_list)
+    # n_imgs = len(img_path_list)
+    #
     # # create train and validation sets
-    # createLabeledUnlabeledSets(root_dir, img_path_list, n_imgs=n_imgs, labeled_portion=0.3)
+    # #createTrainValSets(root_dir, img_path_list, n_imgs=n_imgs, val_portion=0.2)
+    #
+    # # # create train and validation sets
+    # # createLabeledUnlabeledSets(root_dir, img_path_list, n_imgs=n_imgs, labeled_portion=0.3)
 
-    createSemisupervisedSets(os.path.join(root_dir, 'ISIC_Segmenation_dataset_split'),
-                             img_path_list, n_imgs=n_imgs, labeled_portion=0.2, test_portion=0.2)
+    out_dir = os.path.join(root_dir, 'ISIC_Segmenation_dataset_split')
+    # createSemisupervisedSets(out_dir, img_path_list, n_imgs=n_imgs, labeled_portion=0.2, test_portion=0.2)
+
+    out_csv_files = [os.path.join(out_dir, 'random_labeled_tr_segnet1.csv'),
+                     os.path.join(out_dir, 'random_labeled_tr_segnet2.csv'),
+                     os.path.join(out_dir, 'random_labeled_tr_segnet3.csv')]
+    train_csv_file = os.path.join(out_dir, 'random_labeled_tr.csv')
+
+    split_train_set(out_dir, train_csv_file, out_csv_files, n_splits=3)
 
 
 

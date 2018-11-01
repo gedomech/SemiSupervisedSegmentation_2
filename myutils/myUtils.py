@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+import argparse
 
 import torchvision.utils as vutils
 from tensorboardX import SummaryWriter
@@ -88,6 +89,7 @@ def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dic
     :param epoch: epoch which was obtained the scores
     :return:
     """
+    history_score_dict['epoch']=epoch
 
     for idx, net_i in enumerate(nets_):
 
@@ -105,6 +107,8 @@ def save_models(nets_, nets_path_, score_meters=None, epoch=0, history_score_dic
             history_score_dict['segnet']= score_meters[idx].value()[0]
             print('The highest dice score for SegNet is {:.3f} in the test'.format(history_score_dict['segnet']))
             torch.save(net_i.state_dict(), nets_path_[idx])
+
+
     return history_score_dict
 
 
@@ -240,7 +244,7 @@ def get_loss(predictions):
     return loss
 
 
-def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, padding=2,
+def visualize(writer, nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, padding=2,
               normalize=False, range=None, scale_each=False, pad_value=0):
     """
     Visualize n_images from the input set of images (image_set).
@@ -267,7 +271,6 @@ def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, paddi
     else:
         idx = np.arange(n_samples)
 
-    writer = SummaryWriter()
     imgs = image_set[idx, :, :, :]
     for idx, net_i in enumerate(nets_):
         pred_grid = vutils.make_grid(net_i(imgs).cpu(), nrow=nrow, padding=padding, pad_value=pad_value,
@@ -279,7 +282,31 @@ def visualize(nets_, image_set, n_images, c_epoch, randomly=True,  nrow=8, paddi
         else:
             writer.add_image('SegNet Predictions', pred_grid, c_epoch)  # Tensor
 
-    writer.close()
+
+import time
+def s_forward_backward(net,optim, imgs, masks, criterion):
+
+    now = time.time()
+    optim.zero_grad()
+    pred = net(imgs)
+    loss = criterion(pred, masks.squeeze(1))
+    loss.backward()
+    optim.step()
+    dice_score = dice_loss(pred2segmentation(pred), masks.squeeze(1))
+
+    return dice_score
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+
 
 
 def str2bool(v):
