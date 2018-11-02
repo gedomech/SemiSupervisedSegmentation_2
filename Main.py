@@ -35,7 +35,7 @@ unlabeled_batch_size = 2
 val_batch_size = 1
 
 max_epoch_pre = 1
-max_epoch_baseline =
+max_epoch_baseline = 3
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -132,7 +132,7 @@ def pre_train():
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
-        for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
+        for i, (img, mask, _) in tqdm(enumerate(labeled_data_Segnet1)):
             img, mask = img.to(device), mask.to(device)
 
             p_forward = partial(s_forward_backward, imgs=img, masks=mask, criterion=criterion)
@@ -180,7 +180,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
         #     learning_rate_decay(optimizers, 0.95)
 
         # train with labeled data
-        for _ in tqdm(range(max(len(labeled_loader_[0]), len(unlabeled_loader_)))):  # I need to optimize this
+        for _ in range(1):  # I need to optimize this
 
             _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, device, nets_, criterion)
             # _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
