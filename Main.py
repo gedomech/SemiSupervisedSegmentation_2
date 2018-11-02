@@ -102,6 +102,8 @@ historical_score_dict = {
     'mv': 0,
     'jsd': 0}
 
+nets_names = ['segnet1', 'segnet2', 'segnet3']
+
 from functools import partial
 
 
@@ -220,7 +222,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                              'SegNet3_Score': score_meters[2].value()[0],
                              'MV_Score': ensemble_score.value()[0]})
 
-        historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
+        historical_score_dict = save_models(nets_, nets_path, nets_names, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
             historical_score_dict['mv'] = ensemble_score.value()[0]
 
