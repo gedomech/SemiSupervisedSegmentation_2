@@ -150,9 +150,9 @@ def pre_train():
             'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.6f}, unet_dice_score: {3:.6f}, segnet_dice_score: {4:.6f}, with majorty voting: {5:.6f}'.format(
                 epoch + 1,
                 max_epoch_pre,
-                score_meters[0].value()[0],
-                score_meters[1].value()[0],
-                score_meters[2].value()[0],
+                score_meters[0].value()[0].item(),
+                score_meters[1].value()[0].item(),
+                score_meters[2].value()[0].item(),
                 ensemble_score.value()[0]))
 
         historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
@@ -206,24 +206,24 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
 
         # add performance of nets to plot
         nets_score_dict = {"Segnet1": score_meters[0].value()[0].item(),
-                           "Segnet2": score_meters[0].value()[0].item(),
-                           "Segnet3": score_meters[0].value()[0].item(),
-                           "MajVote": ensemble_score.value()[0].item()}
+                           "Segnet2": score_meters[1].value()[0].item(),
+                           "Segnet3": score_meters[2].value()[0].item(),
+                           "MajVote": ensemble_score.value()[0]}
         add_visual_perform(writer, nets_score_dict, epoch+1)
 
         print(
             'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}, with majorty_voting={5:.6f}'.format(
                 epoch + 1,
                 max_epoch_pre,
-                score_meters[0].value()[0],
-                score_meters[1].value()[0],
-                score_meters[2].value()[0],
+                score_meters[0].value()[0].item(),
+                score_meters[1].value()[0].item(),
+                score_meters[2].value()[0].item(),
                 ensemble_score.value()[0]))
 
         cvs_writer.writerow({'Epoch': epoch + 1,
-                             'SegNet1_Score': score_meters[0].value()[0],
-                             'SegNet2_Score': score_meters[1].value()[0],
-                             'SegNet3_Score': score_meters[2].value()[0],
+                             'SegNet1_Score': score_meters[0].value()[0].item(),
+                             'SegNet2_Score': score_meters[1].value()[0].item(),
+                             'SegNet3_Score': score_meters[2].value()[0].item(),
                              'MV_Score': ensemble_score.value()[0]})
 
         historical_score_dict = save_models(nets_, nets_path, nets_names, score_meters, epoch, historical_score_dict)
@@ -293,22 +293,14 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
             'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}, with majorty_voting={5:.6f}'.format(
                 epoch + 1,
                 max_epoch_pre,
-                score_meters[0].value()[0],
-                score_meters[1].value()[0],
-                score_meters[2].value()[0],
-                ensemble_score.value()[0]))
-
-        print(
-            'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.6f}, segnet_dice_score={3:.6f}, with majorty_voting={4:.6f}'.format(
-                epoch + 1,
-                max_epoch_pre,
-                score_meters[0].value()[0],
-                score_meters[1].value()[0],
+                score_meters[0].value()[0].item(),
+                score_meters[1].value()[0].item(),
+                score_meters[2].value()[0].item(),
                 ensemble_score.value()[0]))
 
         cvs_writer.writerow({'Epoch': epoch + 1,
-                             'ENet_Score': score_meters[0].value()[0],
-                             'SegNet_Score': score_meters[1].value()[0],
+                             'ENet_Score': score_meters[0].value()[0].item(),
+                             'SegNet_Score': score_meters[1].value()[0].item(),
                              'MV_Score': ensemble_score.value()[0]})
 
         historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
