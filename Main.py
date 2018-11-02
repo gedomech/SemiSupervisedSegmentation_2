@@ -242,7 +242,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
             records.append(historical_score_dict)
 
             try:
-                pd.DataFrame(records).to_csv('baseline_records_segnet_ens.csv', index=False)
+                pd.DataFrame(records).to_csv('baseline_records_segnet_ens_test.csv', index=False)
             except Exception as e:
                 print(e)
 
