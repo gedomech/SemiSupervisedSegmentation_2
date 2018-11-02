@@ -22,16 +22,16 @@ warnings.filterwarnings('ignore')
 root = "../datasets/ISIC2018"
 
 class_number = 2
-lr = 1e-4
-weigth_decay = 1e-6
+lr = 1e-3
+weigth_decay = 1e-5
 lamda = 5e-2
 
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-number_workers = 2
-labeled_batch_size = 2
-unlabeled_batch_size = 2
-val_batch_size = 1
+number_workers = 8
+labeled_batch_size = 4
+unlabeled_batch_size = 4
+val_batch_size = 4
 
 max_epoch_pre = 50
 max_epoch_baseline = 50
@@ -139,7 +139,7 @@ def train_baseline(net_, net_path_):
             learning_rate_decay(optimizer, 0.95)
 
         # train with labeled data
-        for _ in tqdm(range(4)):  #len(unlabeled_data)
+        for _ in tqdm(range(len(unlabeled_data))):  #
 
             imgs, masks, _ = image_batch_generator(labeled_data, device=device)
             _, llost_list, _ = batch_labeled_loss_(imgs, masks, [net_], criterion)
