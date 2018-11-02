@@ -182,6 +182,22 @@ def batch_labeled_loss_(img,mask,nets,criterion):
     return prediction_list, loss_list, dice_score
 
 
+def batch_labeled_loss_customized(labeled_loaders, device_, nets, criterion):
+    loss_list = []
+    prediction_list = []
+    dice_score = []
+    for idx, loader in enumerate(labeled_loaders):
+        img, mask, _ = image_batch_generator(loader, device=device_)
+        pred = nets[idx](img)
+        labeled_loss = criterion(pred, mask.squeeze(1))
+        loss_list.append(labeled_loss)
+        ds = dice_loss(pred2segmentation(nets[idx](img)), mask.squeeze(1))
+        dice_score.append(ds)
+        prediction_list.append(pred)
+
+    return prediction_list, loss_list, dice_score
+
+
 def batch_labeled_loss_custom(img_list, mask_list, nets, criterion):
     """
     This function compute the loss for each net from the customized training sets
