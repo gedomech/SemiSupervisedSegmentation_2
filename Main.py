@@ -35,7 +35,7 @@ unlabeled_batch_size = 2
 val_batch_size = 1
 
 max_epoch_pre = 1
-max_epoch_baseline = 2
+max_epoch_baseline = 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -220,11 +220,20 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                 score_meters[2].value()[0].item(),
                 ensemble_score.value()[0]))
 
-        cvs_writer.writerow({'Epoch': epoch + 1,
-                             'SegNet1_Score': score_meters[0].value()[0].item(),
-                             'SegNet2_Score': score_meters[1].value()[0].item(),
-                             'SegNet3_Score': score_meters[2].value()[0].item(),
-                             'MV_Score': ensemble_score.value()[0]})
+        # cvs_writer.writerow({'Epoch': epoch + 1,
+        #                      'SegNet1_Score': score_meters[0].value()[0].item(),
+        #                      'SegNet2_Score': score_meters[1].value()[0].item(),
+        #                      'SegNet3_Score': score_meters[2].value()[0].item(),
+        #                      'MV_Score': ensemble_score.value()[0]})
+        rec_data = {'Epoch': epoch + 1,
+                    'SegNet1_Score': score_meters[0].value()[0].item(),
+                    'SegNet2_Score': score_meters[1].value()[0].item(),
+                    'SegNet3_Score': score_meters[2].value()[0].item(),
+                    'MV_Score': ensemble_score.value()[0]}
+        try:
+            pd.DataFrame(rec_data).to_csv('output_baseline_01112018_Segnet.csv', index=False)
+        except Exception as e:
+            print(e)
 
         historical_score_dict = save_models(nets_, nets_path, nets_names, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
