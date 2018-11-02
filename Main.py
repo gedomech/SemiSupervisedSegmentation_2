@@ -182,7 +182,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
         # train with labeled data
         for _ in tqdm(range(max(len(labeled_loader_[0]), len(unlabeled_loader_)))):  # I need to optimize this
 
-            _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, nets_, criterion)
+            _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, device, nets_, criterion)
             # _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
 
             # train with unlabeled data
