@@ -182,6 +182,29 @@ def batch_labeled_loss_(img,mask,nets,criterion):
     return prediction_list, loss_list, dice_score
 
 
+def batch_labeled_loss_custom(img_list, mask_list, nets, criterion):
+    """
+    This function compute the loss for each net from the customized training sets
+    :param img_list:
+    :param mask_list:
+    :param nets:
+    :param criterion:
+    :return:
+    """
+    loss_list = []
+    prediction_list = []
+    dice_score = []
+    for idx, net_i in enumerate(nets):
+        pred_i = net_i(img_list[idx])
+        labeled_loss = criterion(pred_i, mask_list[idx].squeeze(1))
+        loss_list.append(labeled_loss)
+        ds = dice_loss(pred2segmentation(net_i(img_list[idx])), mask_list[idx].squeeze(1))
+        dice_score.append(ds)
+        prediction_list.append(pred_i)
+
+    return prediction_list, loss_list, dice_score
+
+
 from torchnet.meter import AverageValueMeter
 import torch.nn.functional as F
 
