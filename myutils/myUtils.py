@@ -37,7 +37,7 @@ def dice_loss(input, target):
     tflat = target.view(input.size(0),-1)
     intersection = (iflat * tflat).sum(1)
 
-    return ((2. * intersection + smooth).float() /  (iflat.sum(1) + tflat.sum(1) + smooth).float()).mean()
+    return float(((2. * intersection + smooth).float() /  (iflat.sum(1) + tflat.sum(1) + smooth).float()).mean())
 
 def iou_loss(pred, target, n_class):
     ious = []
@@ -155,9 +155,15 @@ def showImages(board,image_batch, mask_batch,segment_batch):
 
 
 def learning_rate_decay(optims, factor=0.95):
-    for opti_i in optims:
-        for param_group in opti_i.param_groups:
-            param_group['lr'] = param_group['lr'] * factor
+
+    for param_group in optims.param_groups:
+        param_group['lr'] = param_group['lr'] * factor
+
+def learning_rate_reset(optims, lr=1e-4):
+
+    for param_group in optims.param_groups:
+        param_group['lr'] = lr
+
 
 def map_(func,*list):
     return [*map(func,*list)]
@@ -202,7 +208,6 @@ def test(nets_,  test_loader_,device, **kwargs):
 
             for idx, net_i in enumerate(nets_):
                 pred_test = nets_[idx](img)
-                # plt.imshow(pred_test[0, 1].cpu().numpy())
 
                 distributions += F.softmax(pred_test, 1)
                 dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
@@ -298,5 +303,16 @@ def s_forward_backward(net,optim, imgs, masks, criterion):
     return dice_score
 
 
+def evaluate(net, dataloader):
+    net.eval()
+    dice_meter = AverageValueMeter()
+    dice_meter.reset()
+    with torch.no_grad():
+        for i, (img, mask, path) in enumerate(dataloader):
+            pred = net(img)
+            pred_mask = pred2segmentation(pred)
+            dice_meter.add(dice_loss(pred_mask, mask))
 
+    net.train()
+    return dice_meter.value()[0]
 
