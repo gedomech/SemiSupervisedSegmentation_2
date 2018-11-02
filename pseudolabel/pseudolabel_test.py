@@ -102,7 +102,8 @@ def pre_train(p):
             loss.backward()
             optimizer.step()
 
-        [labeled_score,unlabeled_score, validation_score] = [evaluate(net, x) for x in (labeled_data,unlabeled_data,test_data)]
+        [labeled_score, unlabeled_score, validation_score] = [evaluate(net, x, device) for x in
+                                                              (labeled_data, unlabeled_data, test_data)]
 
         logging.info('pretrained stage: lab:%3f  unlab:%3f  val:%.3f'%(labeled_score,unlabeled_score,validation_score))
         historical_track.append({'lab':labeled_score,'unlab':unlabeled_score,'val':validation_score,'epoch':epoch})
@@ -151,7 +152,8 @@ def train_baseline(net_, net_path_):
             optimizer.zero_grad()
             total_loss[0].backward()
             optimizer.step()
-        [labeled_score,unlabeled_score, validation_score] = [evaluate(net, x) for x in (labeled_data,unlabeled_data,test_data)]
+        [labeled_score, unlabeled_score, validation_score] = [evaluate(net, x, device) for x in
+                                                              (labeled_data, unlabeled_data, test_data)]
         semi_historical_track.append(
             {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'epoch': epoch})
         pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained','baseline').replace('pth','csv'))
