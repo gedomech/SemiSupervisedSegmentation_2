@@ -2,18 +2,18 @@
 import logging
 import os
 import sys
+
 import pandas as pd
+
 logger = logging.getLogger('spam_application')
 logger.setLevel(logging.INFO)
 sys.path.extend([os.path.dirname(os.getcwd())])
 from myutils.myDataLoader import ISICdata
 from myutils.myENet import Enet
-from myutils.myNetworks import UNet, SegNet
 from myutils.myLoss import CrossEntropyLoss2d
 import warnings
 from tqdm import tqdm
 from myutils.myUtils import *
-import click
 
 warnings.filterwarnings('ignore')
 # writer = SummaryWriter()
@@ -33,8 +33,8 @@ labeled_batch_size = 2
 unlabeled_batch_size = 2
 val_batch_size = 1
 
-max_epoch_pre = 100
-max_epoch_baseline = 100
+max_epoch_pre = 50
+max_epoch_baseline = 50
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10

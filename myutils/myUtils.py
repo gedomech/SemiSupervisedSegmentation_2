@@ -1,11 +1,7 @@
-import torch
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
-
 import torchvision.utils as vutils
-from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader
 
 from myutils.myLoss import JensenShannonDivergence
 
@@ -303,12 +299,13 @@ def s_forward_backward(net,optim, imgs, masks, criterion):
     return dice_score
 
 
-def evaluate(net, dataloader):
+def evaluate(net, dataloader, device):
     net.eval()
     dice_meter = AverageValueMeter()
     dice_meter.reset()
     with torch.no_grad():
         for i, (img, mask, path) in enumerate(dataloader):
+            img, mask = img.to(device), mask.to(device)
             pred = net(img)
             pred_mask = pred2segmentation(pred)
             dice_meter.add(dice_loss(pred_mask, mask))
