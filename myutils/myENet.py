@@ -133,7 +133,7 @@ class BottleNeck(nn.Module):
                                             self.output_channels - self.input_channels,
                                             input_shape[2] // 2,
                                             input_shape[3] // 2).zero_(), requires_grad=False)
-                pad.to(device)
+                pad = pad.to(device)
                 main = torch.cat((main, pad), 1)
         elif self.upsampling:
             main = self.unpool(self.conv_before_unpool(input), pooling_indices)
