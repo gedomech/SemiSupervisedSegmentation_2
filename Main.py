@@ -140,14 +140,14 @@ def pre_train():
             map_(lambda x, y: x.add(y), dice_meters, dices)
 
         print(
-            'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}'.format(
+            'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.6f}, unet_dice_score: {3:.6f}, segnet_dice_score: {4:.6f}'.format(
                 epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
                 dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
         score_meters, ensemble_score = test(nets, test_data, device=device)
 
         print(
-            'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.3f}, unet_dice_score: {3:.3f}, segnet_dice_score: {4:.3f}, with majorty voting: {5:.3f}'.format(
+            'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.6f}, unet_dice_score: {3:.6f}, segnet_dice_score: {4:.6f}, with majorty voting: {5:.6f}'.format(
                 epoch + 1,
                 max_epoch_pre,
                 score_meters[0].value()[0],
@@ -198,21 +198,21 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                 dice_meters[idx].add(dice_score[idx])
 
         print(
-            'train epoch {0:1d}/{1:d} baseline: segnet1_dice_score={2:.3f}, segnet2_dice_score={3:.3f}, segnet3_dice_score={4:.3f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-                dice_meters[1].value()[0], dice_meters[2].value()[0]))
+            'train epoch {0:1d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}'.format(
+                epoch + 1, max_epoch_pre, dice_meters[0].value()[0].item(),
+                dice_meters[1].value()[0].item(), dice_meters[2].value()[0].item()))
 
         score_meters, ensemble_score = test(nets_, test_data, device=device)
 
         # add performance of nets to plot
-        nets_score_dict = {"Segnet1": score_meters[0].value()[0],
-                           "Segnet2": score_meters[0].value()[0],
-                           "Segnet3": score_meters[0].value()[0],
-                           "MajVote": ensemble_score.value()[0]}
+        nets_score_dict = {"Segnet1": score_meters[0].value()[0].item(),
+                           "Segnet2": score_meters[0].value()[0].item(),
+                           "Segnet3": score_meters[0].value()[0].item(),
+                           "MajVote": ensemble_score.value()[0].item()}
         add_visual_perform(writer, nets_score_dict, epoch+1)
 
         print(
-            'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.3f}, segnet2_dice_score={3:.3f}, segnet3_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
+            'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}, with majorty_voting={5:.6f}'.format(
                 epoch + 1,
                 max_epoch_pre,
                 score_meters[0].value()[0],
@@ -233,7 +233,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
             records.append(historical_score_dict)
 
             try:
-                pd.DataFrame(records).to_csv('baseline_records_segnet_ens.csv')
+                pd.DataFrame(records).to_csv('baseline_records_segnet_ens.csv', index=False)
             except Exception as e:
                 print(e)
 
@@ -283,14 +283,14 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                 dice_meters[idx].add(dice_score[idx])
 
         print(
-            'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}'.format(
+            'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.6f}, segnet_dice_score={3:.6f}'.format(
                 epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
                 dice_meters[1].value()[0], dice_meters[2].value()[0]))
 
         score_meters, ensemble_score = test(nets_, test_data, device=device)
 
         print(
-            'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.3f}, segnet2_dice_score={3:.3f}, segnet3_dice_score={4:.3f}, with majorty_voting={5:.3f}'.format(
+            'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}, with majorty_voting={5:.6f}'.format(
                 epoch + 1,
                 max_epoch_pre,
                 score_meters[0].value()[0],
@@ -299,7 +299,7 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                 ensemble_score.value()[0]))
 
         print(
-            'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.3f}, segnet_dice_score={3:.3f}, with majorty_voting={4:.3f}'.format(
+            'val epoch {0:d}/{1:d} baseline: enet_dice_score={2:.6f}, segnet_dice_score={3:.6f}, with majorty_voting={4:.6f}'.format(
                 epoch + 1,
                 max_epoch_pre,
                 score_meters[0].value()[0],
