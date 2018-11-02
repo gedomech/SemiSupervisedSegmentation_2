@@ -42,8 +42,8 @@ val_print_frequncy = 10
 
 Equalize = False
 # data for semi-supervised training
-# labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
-#                         dataAugment=False, equalize=Equalize)
+labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
+                        dataAugment=False, equalize=Equalize)
 
 # customizing labeled training sets for SegNets
 labeled_data_Segnet1 = ISICdata(root=root, model='labeled', mode='customized', transform=True,
@@ -199,7 +199,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
 
         print(
             'train epoch {0:1d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0].item(),
+                epoch + 1, max_epoch_baseline, dice_meters[0].value()[0].item(),
                 dice_meters[1].value()[0].item(), dice_meters[2].value()[0].item()))
 
         score_meters, ensemble_score = test(nets_, test_data, device=device)
@@ -214,7 +214,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
         print(
             'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}, with majorty_voting={5:.6f}'.format(
                 epoch + 1,
-                max_epoch_pre,
+                max_epoch_baseline,
                 score_meters[0].value()[0].item(),
                 score_meters[1].value()[0].item(),
                 score_meters[2].value()[0].item(),
@@ -353,11 +353,12 @@ if __name__ == "__main__":
     elif args.baseline:
         # Baseline Training Stage
         print('STARTING THE BASELINE TRAINING STAGE')
-        baseline_file = open('output_baseline_01112018_Segnet.csv', 'w')
+        # baseline_file = open('output_baseline_01112018_Segnet.csv', 'w')
         # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-        baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
-        baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
-        baseline_writer.writeheader()
+        # baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
+        # baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
+        # baseline_writer.writeheader()
+        baseline_writer = None
         train_baseline(nets,
                        nets_path_,
                        [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
@@ -367,9 +368,22 @@ if __name__ == "__main__":
     elif args.ensemble:
         # Ensemble Training Stage
         print('STARTING THE ENSEMBLE TRAINING STAGE')
-        ensemble_file = open('output_ensemble_31102018.csv', 'w')
-        ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-        ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
-        ensemble_writer.writeheader()
+        # ensemble_file = open('output_ensemble_31102018.csv', 'w')
+        # ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        # ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
+        # ensemble_writer.writeheader()
+        baseline_writer = None
+        train_baseline(nets,
+                       nets_path_,
+                       [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
+                       unlabeled_data,
+                       baseline_writer)
         # train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
 
+    # baseline_writer = None
+    # nets_path_ = 3 * ['checkpoint/best_SegNet_pre-trained.pth']
+    # train_baseline(nets,
+    # #                    nets_path_,
+    # #                    [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
+    # #                    unlabeled_data,
+    # #                    baseline_writer)
