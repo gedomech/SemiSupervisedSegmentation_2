@@ -42,8 +42,17 @@ val_print_frequncy = 10
 
 Equalize = False
 # data for semi-supervised training
-labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
-                        dataAugment=False, equalize=Equalize)
+# labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
+#                         dataAugment=False, equalize=Equalize)
+
+# customizing labeled training sets for SegNets
+labeled_data_Segnet1 = ISICdata(root=root, model='labeled', mode='customized', transform=True,
+                                img_gts_file='random_labeled_tr_segnet1.csv', dataAugment=False, equalize=Equalize)
+labeled_data_Segnet2 = ISICdata(root=root, model='labeled', mode='customized', transform=True,
+                                img_gts_file='random_labeled_tr_segnet2.csv', dataAugment=False, equalize=Equalize)
+labeled_data_Segnet3 = ISICdata(root=root, model='labeled', mode='customized', transform=True,
+                                img_gts_file='random_labeled_tr_segnet3.csv', dataAugment=False, equalize=Equalize)
+
 unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=True,
                           dataAugment=False, equalize=Equalize)
 test_data = ISICdata(root=root, model='test', mode='semi', transform=True,
@@ -59,7 +68,11 @@ unlabeled_loader_params = {'batch_size': unlabeled_batch_size,
                            'num_workers': number_workers,
                            'pin_memory': True}
 
-labeled_data = DataLoader(labeled_data, **labeled_loader_params)
+# customizing labeled training dataloaders for SegNets
+labeled_data_Segnet1 = DataLoader(labeled_data_Segnet1, **labeled_loader_params)
+labeled_data_Segnet2 = DataLoader(labeled_data_Segnet2, **labeled_loader_params)
+labeled_data_Segnet3 = DataLoader(labeled_data_Segnet3, **labeled_loader_params)
+
 unlabeled_data = DataLoader(unlabeled_data, **unlabeled_loader_params)
 test_data = DataLoader(test_data, **unlabeled_loader_params)
 
@@ -86,23 +99,14 @@ criterion = CrossEntropyLoss2d(class_weigth).to(device) if (
     class_weigth)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 
-# historical_score_dict = {
-#     'epoch': -1,
-#     'enet': 0,
-#     'unet': 0,
-#     'segnet': 0,
-#     'mv': 0,
-#     'jsd': 0}
-
+nets_names = ['segnet1', 'segnet2', 'segnet3']
 historical_score_dict = {
     'epoch': -1,
-    'segnet1': 0,
-    'segnet2': 0,
-    'segnet3': 0,
+    nets_names[0]: 0,
+    nets_names[1]: 0,
+    nets_names[2]: 0,
     'mv': 0,
     'jsd': 0}
-
-nets_names = ['segnet1', 'segnet2', 'segnet3']
 
 from functools import partial
 
@@ -156,7 +160,7 @@ def pre_train():
         # visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
 
 
-def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_writer):
+def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, cvs_writer):
     records =[]
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
@@ -176,10 +180,10 @@ def train_baseline(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
         #     learning_rate_decay(optimizers, 0.95)
 
         # train with labeled data
-        for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))): #
+        for _ in tqdm(range(max(len(labeled_loader_[0]), len(unlabeled_loader_)))):  # I need to optimize this
 
-            imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
-            _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
+            _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, nets_, criterion)
+            # _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
 
             # train with unlabeled data
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
