@@ -35,7 +35,7 @@ unlabeled_batch_size = 1
 val_batch_size = 1
 
 max_epoch_pre = 1
-max_epoch_baseline = 3
+max_epoch_baseline = 2
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -244,7 +244,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                     'SegNet3_Score': score_meters[2].value()[0].item(),
                     'MV_Score': ensemble_score.value()[0]}
         try:
-            pd.DataFrame([rec_data]).to_csv('output_baseline_01112018_Segnet.csv', index=False, float_format='%.4f')
+            pd.DataFrame([rec_data]).to_csv('output_baseline_01112018_Segnet.csv', index=False)
         except Exception as e:
             print(e)
 
