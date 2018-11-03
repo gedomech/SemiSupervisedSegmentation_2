@@ -91,24 +91,24 @@ def save_models(nets_, nets_path_, nets_names, score_meters=None, epoch=0, histo
     :param history_score_dict:
     :return:
     """
-    history_score_dict['epoch']=epoch+1
+    history_score_dict['epoch'] = epoch+1
 
     for idx, net_i in enumerate(nets_):
 
         if (idx == 0) and ( history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
-            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0]
+            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0].item()
             print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
                                                                                history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 1) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
-            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0]
+            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0].item()
             print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
                                                                                history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
         elif (idx == 2) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
-            history_score_dict[nets_names[idx]]= score_meters[idx].value()[0]
+            history_score_dict[nets_names[idx]]= score_meters[idx].value()[0].item()
             print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
                                                                                history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
@@ -198,29 +198,6 @@ def batch_labeled_loss_customized(labeled_loaders, device_, nets, criterion):
     return prediction_list, loss_list, dice_score
 
 
-def batch_labeled_loss_custom(img_list, mask_list, nets, criterion):
-    """
-    This function compute the loss for each net from the customized training sets
-    :param img_list:
-    :param mask_list:
-    :param nets:
-    :param criterion:
-    :return:
-    """
-    loss_list = []
-    prediction_list = []
-    dice_score = []
-    for idx, net_i in enumerate(nets):
-        pred_i = net_i(img_list[idx])
-        labeled_loss = criterion(pred_i, mask_list[idx].squeeze(1))
-        loss_list.append(labeled_loss)
-        ds = dice_loss(pred2segmentation(net_i(img_list[idx])), mask_list[idx].squeeze(1))
-        dice_score.append(ds)
-        prediction_list.append(pred_i)
-
-    return prediction_list, loss_list, dice_score
-
-
 from torchnet.meter import AverageValueMeter
 import torch.nn.functional as F
 
@@ -251,11 +228,10 @@ def test(nets_,  test_loader_,device, **kwargs):
                 dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
                 dice_meters_test[idx].add(dice_test)
 
-                # To test validation value per net
-
-                print('For image {} dice_meters_test value {} for net {}'.format(i,
-                                                                                 dice_test,
-                                                                                 idx))
+                # # To test validation value per net
+                # print('For image {} dice_meters_test value {} for net {}'.format(i,
+                #                                                                  dice_test,
+                #                                                                  idx))
 
             distributions /= len(nets_)
             mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
