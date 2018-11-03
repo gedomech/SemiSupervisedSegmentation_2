@@ -30,8 +30,8 @@ lamda = 5e-2
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 number_workers = 0
-labeled_batch_size = 2
-unlabeled_batch_size = 2
+labeled_batch_size = 1
+unlabeled_batch_size = 1
 val_batch_size = 1
 
 max_epoch_pre = 1
