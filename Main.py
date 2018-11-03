@@ -16,7 +16,6 @@ import csv
 import argparse
 
 warnings.filterwarnings('ignore')
-writer = SummaryWriter()
 
 # torch.set_num_threads(1)  # set by deafault to 1
 root = "datasets/ISIC2018"
