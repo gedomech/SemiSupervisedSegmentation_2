@@ -239,9 +239,9 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                              'SegNet3_Score': score_meters[2].value()[0].item(),
                              'MV_Score': ensemble_score.value()[0]})
         rec_data = {'Epoch': epoch + 1,
-                    'SegNet1_Score': score_meters[0].value()[0],
-                    'SegNet2_Score': score_meters[1].value()[0],
-                    'SegNet3_Score': score_meters[2].value()[0],
+                    'SegNet1_Score': score_meters[0].value()[0].item(),
+                    'SegNet2_Score': score_meters[1].value()[0].item(),
+                    'SegNet3_Score': score_meters[2].value()[0].item(),
                     'MV_Score': ensemble_score.value()[0]}
         try:
             pd.DataFrame([rec_data]).to_csv('output_baseline_01112018_Segnet.csv', index=False, float_format='%.4f')
