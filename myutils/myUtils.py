@@ -191,7 +191,7 @@ def batch_labeled_loss_customized(labeled_loaders, device_, nets, criterion):
         pred = nets[idx](img)
         labeled_loss = criterion(pred, mask.squeeze(1))
         loss_list.append(labeled_loss)
-        ds = dice_loss(pred2segmentation(nets[idx](img)), mask.squeeze(1))
+        ds = dice_loss(pred2segmentation(pred), mask.squeeze(1))
         dice_score.append(ds)
         prediction_list.append(pred)
 
