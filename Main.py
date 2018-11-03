@@ -174,6 +174,17 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                  'checkpoint/best_SegNet2_baseline_test.pth',
                  'checkpoint/best_SegNet3_baseline_test.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
+
+    # registering the initial performance of the pre-trained networks
+    score_meters, ensemble_score = test(nets_, test_data, device=device)
+
+    # add performance of nets to plot
+    nets_score_dict = {"Segnet1": score_meters[0].value()[0].item(),
+                       "Segnet2": score_meters[1].value()[0].item(),
+                       "Segnet3": score_meters[2].value()[0].item(),
+                       "MajVote": ensemble_score.value()[0]}
+    add_visual_perform(writer, nets_score_dict, 0)
+
     print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
@@ -227,15 +238,15 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                              'SegNet2_Score': score_meters[1].value()[0].item(),
                              'SegNet3_Score': score_meters[2].value()[0].item(),
                              'MV_Score': ensemble_score.value()[0]})
-        # rec_data = {'Epoch': epoch + 1,
-        #             'SegNet1_Score': score_meters[0].value()[0],
-        #             'SegNet2_Score': score_meters[1].value()[0],
-        #             'SegNet3_Score': score_meters[2].value()[0],
-        #             'MV_Score': ensemble_score.value()[0]}
-        # try:
-        #     pd.DataFrame(rec_data).to_csv('output_baseline_01112018_Segnet.csv', index=False)
-        # except Exception as e:
-        #     print(e)
+        rec_data = {'Epoch': epoch + 1,
+                    'SegNet1_Score': score_meters[0].value()[0],
+                    'SegNet2_Score': score_meters[1].value()[0],
+                    'SegNet3_Score': score_meters[2].value()[0],
+                    'MV_Score': ensemble_score.value()[0]}
+        try:
+            pd.DataFrame([rec_data]).to_csv('output_baseline_01112018_Segnet.csv', index=False, float_format='%.4f')
+        except Exception as e:
+            print(e)
 
         historical_score_dict = save_models(nets_, nets_path, nets_names, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
@@ -244,7 +255,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
             records.append(historical_score_dict)
 
             try:
-                pd.DataFrame(records).to_csv('baseline_records_segnet_ens_test.csv', index=False)
+                pd.DataFrame(records).to_csv('baseline_records_segnet_ens_test.csv', index=False, float_format='%.4f')
             except Exception as e:
                 print(e)
 
