@@ -81,7 +81,9 @@ test_data = DataLoader(test_data, **unlabeled_loader_params)
 #         #UNet(class_number),
 #         SegNet(class_number)]
 
-nets = 3*[SegNet(class_number)]
+nets = [SegNet(class_number),
+        SegNet(class_number),
+        SegNet(class_number)]
 
 nets = map_(lambda x: x.to(device), nets)
 
