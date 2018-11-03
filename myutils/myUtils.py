@@ -251,6 +251,12 @@ def test(nets_,  test_loader_,device, **kwargs):
                 dice_test = dice_loss(pred2segmentation(pred_test), mask.squeeze(1))
                 dice_meters_test[idx].add(dice_test)
 
+                # To test validation value per net
+
+                print('For image {} dice_meters_test value {} for net {}'.format(i,
+                                                                                 dice_meters_test[idx].value()[0],
+                                                                                 idx))
+
             distributions /= len(nets_)
             mv_dice_score = dice_loss(pred2segmentation(distributions), mask.squeeze(1))
             mv_dice_score_meter.add(mv_dice_score.item())
