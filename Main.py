@@ -169,9 +169,9 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
     #  loading pre-trained models
     map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
     global historical_score_dict
-    nets_path = ['checkpoint/best_SegNet1_baseline_test.pth',
-                 'checkpoint/best_SegNet2_baseline_test.pth',
-                 'checkpoint/best_SegNet3_baseline_test.pth']
+    nets_path = ['checkpoint/best_SegNet1_baseline.pth',
+                 'checkpoint/best_SegNet2_baseline.pth',
+                 'checkpoint/best_SegNet3_baseline.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     # registering the initial performance of the pre-trained networks
@@ -243,7 +243,8 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                     'SegNet3_Score': score_meters[2].value()[0].item(),
                     'MV_Score': ensemble_score.value()[0]}
         try:
-            pd.DataFrame([rec_data]).to_csv('output_baseline_01112018_Segnet.csv', index=False)
+            pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv',
+                                            index=False, float_format='%.4f')
         except Exception as e:
             print(e)
 
@@ -254,7 +255,8 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
             records.append(historical_score_dict)
 
             try:
-                pd.DataFrame(records).to_csv('baseline_records_segnet_ens_test.csv', index=False, float_format='%.4f')
+                pd.DataFrame(records).to_csv('baseline_03112018_segnet_best_record.csv',
+                                             index=False, float_format='%.4f')
             except Exception as e:
                 print(e)
 
@@ -365,7 +367,7 @@ if __name__ == "__main__":
     elif args.baseline:
         # Baseline Training Stage
         print('STARTING THE BASELINE TRAINING STAGE')
-        baseline_file = open('output_baseline_01112018_Segnet_test_outside.csv', 'w')
+        baseline_file = open('baseline_03112018_segnet_outside.csv', 'w')
         # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
         baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
         baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
