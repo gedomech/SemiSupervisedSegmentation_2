@@ -254,7 +254,7 @@ def test(nets_,  test_loader_,device, **kwargs):
                 # To test validation value per net
 
                 print('For image {} dice_meters_test value {} for net {}'.format(i,
-                                                                                 dice_meters_test[idx].value()[0],
+                                                                                 dice_test,
                                                                                  idx))
 
             distributions /= len(nets_)
