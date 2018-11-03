@@ -35,7 +35,7 @@ unlabeled_batch_size = 2
 val_batch_size = 1
 
 max_epoch_pre = 1
-max_epoch_baseline = 100
+max_epoch_baseline = 3
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -242,7 +242,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
             records.append(historical_score_dict)
 
             try:
-                pd.DataFrame(records).to_csv('baseline_records_segnet_ens.csv', index=False)
+                pd.DataFrame(records).to_csv('baseline_records_segnet_ens_test.csv', index=False)
             except Exception as e:
                 print(e)
 
@@ -353,12 +353,11 @@ if __name__ == "__main__":
     elif args.baseline:
         # Baseline Training Stage
         print('STARTING THE BASELINE TRAINING STAGE')
-        # baseline_file = open('output_baseline_01112018_Segnet.csv', 'w')
+        baseline_file = open('output_baseline_01112018_Segnet_test_outside.csv', 'w')
         # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-        # baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
-        # baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
-        # baseline_writer.writeheader()
-        baseline_writer = None
+        baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
+        baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
+        baseline_writer.writeheader()
         train_baseline(nets,
                        nets_path_,
                        [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
@@ -368,22 +367,17 @@ if __name__ == "__main__":
     elif args.ensemble:
         # Ensemble Training Stage
         print('STARTING THE ENSEMBLE TRAINING STAGE')
-        # ensemble_file = open('output_ensemble_31102018.csv', 'w')
-        # ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-        # ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
-        # ensemble_writer.writeheader()
-        baseline_writer = None
-        train_baseline(nets,
-                       nets_path_,
-                       [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
-                       unlabeled_data,
-                       baseline_writer)
+        ensemble_file = open('output_ensemble_31102018.csv', 'w')
+        ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
+        ensemble_writer.writeheader()
         # train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
 
     # baseline_writer = None
     # nets_path_ = 3 * ['checkpoint/best_SegNet_pre-trained.pth']
     # train_baseline(nets,
-    # #                    nets_path_,
-    # #                    [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
-    # #                    unlabeled_data,
-    # #                    baseline_writer)
+    #                nets_path_,
+    #                [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
+    #                unlabeled_data,
+    #                baseline_writer)
+
