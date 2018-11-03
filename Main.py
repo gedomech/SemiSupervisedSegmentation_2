@@ -35,7 +35,7 @@ unlabeled_batch_size = 2
 val_batch_size = 1
 
 max_epoch_pre = 1
-max_epoch_baseline = 3
+max_epoch_baseline = 1
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -168,9 +168,9 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
     #  loading pre-trained models
     map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
     global historical_score_dict
-    nets_path = ['checkpoint/best_SegNet1_baseline.pth',
-                 'checkpoint/best_SegNet2_baseline.pth',
-                 'checkpoint/best_SegNet3_baseline.pth']
+    nets_path = ['checkpoint/best_SegNet1_baseline_test.pth',
+                 'checkpoint/best_SegNet2_baseline_test.pth',
+                 'checkpoint/best_SegNet3_baseline_test.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
     print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
