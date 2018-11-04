@@ -33,8 +33,8 @@ labeled_batch_size = 4
 unlabeled_batch_size = 4
 val_batch_size = 4
 
-max_epoch_pre = 50
-max_epoch_baseline = 50
+max_epoch_pre = 100
+max_epoch_baseline = 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -89,8 +89,10 @@ def pre_train(p):
     labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
     print('the length of the labeled dataset is: %d'%labeled_len)
     best_dev_score = -1
+    schduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 50, 85], gamma=0.2)
 
     for epoch in range(max_epoch_pre):
+        schduler.step()
 
         if epoch +1 % 5 == 0:
             learning_rate_decay(optimizer, 0.95)
@@ -136,11 +138,9 @@ def train_baseline(net_, net_path_):
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20.40, 60, 80], gamma=0.5)
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
-
-        if epoch+1 % 5 == 0:
-            learning_rate_decay(optimizer, 0.95)
 
         # train with labeled data
         for _ in tqdm(range(len(unlabeled_data))):  #
