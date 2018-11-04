@@ -29,7 +29,7 @@ lamda = 5e-2
 
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-number_workers = 1
+number_workers = 4
 labeled_batch_size = 4
 unlabeled_batch_size = 4
 val_batch_size = 4
@@ -138,6 +138,11 @@ def train_baseline(net_, net_path_):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
         scheduler.step()
 
+        [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
+                                                                         (labeled_data, unlabeled_data, dev_data,
+                                                                          val_data)]
+        semi_historical_track.append(
+            {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
         # train with labeled data
         for _ in tqdm(range(len(unlabeled_data))):  #
 
@@ -152,11 +157,7 @@ def train_baseline(net_, net_path_):
             optimizer.zero_grad()
             total_loss[0].backward()
             optimizer.step()
-        [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
-                                                                         (labeled_data, unlabeled_data, dev_data,
-                                                                          val_data)]
-        semi_historical_track.append(
-            {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
+
         pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv'))
 
         if dev_score > best_dev_score:
