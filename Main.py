@@ -246,11 +246,11 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                     'MV_Score': ensemble_score.value()[0]}
 
         try:
-            if not os.path.isfile('baseline_03112018_segnet.csv'):
-                pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', header='column_names',
+            if not os.path.isfile('baseline_04112018_segnet.csv'):
+                pd.DataFrame([rec_data]).to_csv('baseline_04112018_segnet.csv', header='column_names',
                                                 index=False, float_format='%.4f')
             else:
-                pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', header=False,
+                pd.DataFrame([rec_data]).to_csv('baseline_04112018_segnet.csv', header=False,
                                                 index=False, float_format='%.4f', mode='a', )
         except Exception as e:
             print(e)
@@ -262,7 +262,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
             records.append(historical_score_dict)
 
             try:
-                pd.DataFrame(records).to_csv('baseline_03112018_segnet_best_record.csv',
+                pd.DataFrame(records).to_csv('baseline_04112018_segnet_best_record.csv',
                                              index=False, float_format='%.4f')
             except Exception as e:
                 print(e)
@@ -300,8 +300,8 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
 
-        # if epoch % 5 == 0:
-        #     learning_rate_decay(optimizers, 0.95)
+        if epoch % 5 == 0:
+            learning_rate_decay(optimizers, 0.95)
 
         for _ in tqdm(range(max(len(labeled_loader_[0]), len(unlabeled_loader_)))):  # max(len(labeled_loader_), len(unlabeled_loader_)
             # === train with labeled data ===
