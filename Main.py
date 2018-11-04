@@ -424,6 +424,11 @@ if __name__ == "__main__":
         ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
         ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
         ensemble_writer.writeheader()
+        train_baseline(nets,
+                       nets_path_,
+                       [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
+                       unlabeled_data,
+                       ensemble_writer)
         # train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
 
     # baseline_writer = None
