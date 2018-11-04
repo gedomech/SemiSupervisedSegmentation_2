@@ -242,18 +242,18 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                     'SegNet2_Score': score_meters[1].value()[0].item(),
                     'SegNet3_Score': score_meters[2].value()[0].item(),
                     'MV_Score': ensemble_score.value()[0]}
-        # pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', mode='a',
-        #                                 index=False, float_format='%.4f')
+        pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', mode='a',
+                                        index=False, float_format='%.4f')
 
-        try:
-            if not os.path.isfile('baseline_03112018_segnet.csv'):
-                pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv',
-                                                index=False, float_format='%.4f')
-            else:
-                pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', mode='a',
-                                                index=False, float_format='%.4f')
-        except Exception as e:
-            print(e)
+        # try:
+        #     if not os.path.isfile('baseline_03112018_segnet.csv'):
+        #         pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv',
+        #                                         index=False, float_format='%.4f')
+        #     else:
+        #         pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', mode='a',
+        #                                         index=False, float_format='%.4f')
+        # except Exception as e:
+        #     print(e)
 
         historical_score_dict = save_models(nets_, nets_path, nets_names, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['mv']:
