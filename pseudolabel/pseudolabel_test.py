@@ -29,7 +29,7 @@ lamda = 5e-2
 
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-number_workers = 8
+number_workers = 1
 labeled_batch_size = 4
 unlabeled_batch_size = 4
 val_batch_size = 4
@@ -65,7 +65,7 @@ labeled_data = DataLoader(labeled_data, **labeled_loader_params)
 unlabeled_data = DataLoader(unlabeled_data, **unlabeled_loader_params)
 dev_data = DataLoader(dev_data, **unlabeled_loader_params)
 val_data = DataLoader(val_data, **unlabeled_loader_params)
-
+map_location=lambda storage, loc: storage
 ## networks and optimisers
 net = Enet(class_number)
 net = net.to(device)
@@ -93,10 +93,6 @@ def pre_train(p):
 
     for epoch in range(max_epoch_pre):
         schduler.step()
-
-        if epoch + 1 % 5 == 0:
-            learning_rate_decay(optimizer, 0.95)
-
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
             optimizer.zero_grad()
@@ -129,8 +125,8 @@ def train_baseline(net_, net_path_):
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
     #  loading pre-trained models
-    net_.load_state_dict(torch.load(net_path_, )['state_dict'])
-    labeled_data = torch.load(net_path_, )['labeled_dataloader']
+    net_.load_state_dict(torch.load(net_path_, map_location= map_location)['state_dict'])
+    labeled_data = torch.load(net_path_,map_location=map_location )['labeled_dataloader']
     print('the length of the labeled dataset is: %d' % labeled_data.dataset.imgs.__len__())
     net_.train()
     learning_rate_reset(optimizer, lr=1e-5)
@@ -182,5 +178,5 @@ if __name__ == "__main__":
         if args.baseline:
             train_baseline(net, saved_path)
     elif args.baseline:
-        saved_path = '../checkpoint/enet_pretrained_%.1f.pth' % args.p
+        saved_path = 'enet_pretrained_%.1f.pth' % float(args.p)
         train_baseline(net, saved_path)

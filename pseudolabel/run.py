@@ -16,7 +16,7 @@ class iterator_:
             return self.iter.__next__()[1]
 
 
-GPU = iterator_([0, 1, 2])
+GPU = iterator_([0, 1])
 
 
 cmds = []
@@ -24,5 +24,5 @@ for p in ps:
     cmds.append('CUDA_VISIBLE_DEVICES=%d python pseudolabel_test.py --p %.2f'%(GPU(), p))
 print(cmds)
 
-P = Pool(3)
+P = Pool(1)
 P.map(os.system, cmds)
