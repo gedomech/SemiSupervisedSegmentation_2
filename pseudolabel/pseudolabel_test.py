@@ -33,8 +33,8 @@ labeled_batch_size = 4
 unlabeled_batch_size = 4
 val_batch_size = 4
 
-max_epoch_pre = 100
-max_epoch_baseline = 100
+max_epoch_pre = 200
+max_epoch_baseline = 200
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -77,24 +77,23 @@ class_weigth = [1 * 0.1, 3.53]
 class_weigth = torch.Tensor(class_weigth)
 criterion = CrossEntropyLoss2d(class_weigth).to(device)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
-historical_track= []
+historical_track = []
 
 
 def pre_train(p):
+    net_save_path = 'enet_pretrained_%.1f.pth' % float(p)
 
-    net_save_path = 'enet_pretrained_%.1f.pth'%float(p)
-
-    labeled_len = int(labeled_data.dataset.imgs.__len__()*float(p))
+    labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
     labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
     labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
-    print('the length of the labeled dataset is: %d'%labeled_len)
+    print('the length of the labeled dataset is: %d' % labeled_len)
     best_dev_score = -1
-    schduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 50, 85], gamma=0.2)
+    schduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 150, 175], gamma=0.2)
 
     for epoch in range(max_epoch_pre):
         schduler.step()
 
-        if epoch +1 % 5 == 0:
+        if epoch + 1 % 5 == 0:
             learning_rate_decay(optimizer, 0.95)
 
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
@@ -110,18 +109,17 @@ def pre_train(p):
                                                                           val_data)]
 
         logging.info('pretrained stage: lab:%3f  unlab:%3f  dev:%3f   val:%.3f' % (
-        labeled_score, unlabeled_score, dev_score, validation_score))
+            labeled_score, unlabeled_score, dev_score, validation_score))
         historical_track.append(
             {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
-        pd.DataFrame(historical_track).to_csv(net_save_path.replace('pth','csv'))
+        pd.DataFrame(historical_track).to_csv(net_save_path.replace('pth', 'csv'))
 
         if dev_score > best_dev_score:
             dict_to_save = {'labeled_dataloader': labeled_data,
-                            'state_dict':net.state_dict()}
-            torch.save(dict_to_save,net_save_path)
+                            'state_dict': net.state_dict()}
+            torch.save(dict_to_save, net_save_path)
             best_dev_score = dev_score
     return net_save_path, best_dev_score
-
 
 
 def train_baseline(net_, net_path_):
@@ -131,16 +129,17 @@ def train_baseline(net_, net_path_):
     """
     #  loading pre-trained models
     net_.load_state_dict(torch.load(net_path_, )['state_dict'])
-    labeled_data =torch.load(net_path_, )['labeled_dataloader']
-    print('the length of the labeled dataset is: %d'%labeled_data.dataset.imgs.__len__())
+    labeled_data = torch.load(net_path_, )['labeled_dataloader']
+    print('the length of the labeled dataset is: %d' % labeled_data.dataset.imgs.__len__())
     net_.train()
-    learning_rate_reset(optimizer, lr = 1e-5)
+    learning_rate_reset(optimizer, lr=1e-5)
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20.40, 60, 80], gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
+        scheduler.step()
 
         # train with labeled data
         for _ in tqdm(range(len(unlabeled_data))):  #
@@ -161,24 +160,26 @@ def train_baseline(net_, net_path_):
                                                                           val_data)]
         semi_historical_track.append(
             {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
-        pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained','baseline').replace('pth','csv'))
+        pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv'))
 
         if dev_score > best_dev_score:
-            torch.save(net.state_dict(),net_path_.replace('pretrained','baseline'))
+            torch.save(net.state_dict(), net_path_.replace('pretrained', 'baseline'))
             best_dev_score = dev_score
-
 
 
 if __name__ == "__main__":
     # Pre-training Stage
     import argparse
+
     parser = argparse.ArgumentParser(description='split the training data')
-    parser.add_argument('--p',default=0.8)
+    parser.add_argument('--p', default=0.8)
+    parser.add_argument('--pretrain', default=False)
+    parser.add_argument('--baseline', default=True)
     args = parser.parse_args()
-    saved_path, pretrained_score = pre_train(args.p)
-    train_baseline(net,saved_path)
-
-
-
-
-
+    if args.pretrain:
+        saved_path, pretrained_score = pre_train(args.p)
+        if args.baseline:
+            train_baseline(net, saved_path)
+    elif args.baseline:
+        saved_path = '../checkpoint/enet_pretrained_%.1f.pth' % args.p
+        train_baseline(net, saved_path)
