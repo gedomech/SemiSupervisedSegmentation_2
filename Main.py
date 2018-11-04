@@ -250,7 +250,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                 pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', header='column_names',
                                                 index=False, float_format='%.4f')
             else:
-                pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', header='column_names',
+                pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', header=False,
                                                 index=False, float_format='%.4f', mode='a', )
         except Exception as e:
             print(e)
