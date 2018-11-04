@@ -421,7 +421,7 @@ if __name__ == "__main__":
         # Ensemble Training Stage
         print('STARTING THE ENSEMBLE TRAINING STAGE')
         ensemble_file = open('baseline_04112018_segnet_outside.csv', 'w')
-        ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+        ensemble_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
         ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
         ensemble_writer.writeheader()
         train_baseline(nets,
