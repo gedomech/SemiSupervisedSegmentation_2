@@ -242,7 +242,7 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                     'SegNet2_Score': score_meters[1].value()[0].item(),
                     'SegNet3_Score': score_meters[2].value()[0].item(),
                     'MV_Score': ensemble_score.value()[0]}
-        pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv', mode='a',
+        pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv',
                                         index=False, float_format='%.4f')
 
         # try:
