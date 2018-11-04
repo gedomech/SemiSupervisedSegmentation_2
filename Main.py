@@ -34,8 +34,8 @@ unlabeled_batch_size = 1
 val_batch_size = 1
 
 max_epoch_pre = 1
-max_epoch_baseline = 100
-max_epoch_ensemble = 100
+max_epoch_baseline = 2
+max_epoch_ensemble = 2
 train_print_frequncy = 10
 val_print_frequncy = 10
 
@@ -187,14 +187,16 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
     print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
+        for idx, _ in enumerate(nets_):
+            dice_meters[idx].reset()
 
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
-        # train with labeled data
         for _ in tqdm(range(max(len(labeled_loader_[0]), len(unlabeled_loader_)))):  # I need to optimize this
-
+            # === train with labeled data ===
             _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, device, nets_, criterion)
+            # imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
             # _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
 
             # train with unlabeled data
@@ -276,27 +278,36 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
     global historical_score_dict
     map_(lambda x, y: [x.load_state_dict(torch.load(y, map_location='cpu')), x.train()], nets_, nets_path_)
 
-    # nets_path = ['checkpoint/best_ENet_ensemble.pth',
-    #              # 'checkpoint/best_UNet_ensemble.pth',
-    #              'checkpoint/best_SegNet_ensemble.pth']
-    nets_path = ['checkpoint/best_SegNet1_pre-trained.pth',
-                 'checkpoint/best_SegNet2_pre-trained.pth',
-                 'checkpoint/best_SegNet3_pre-trained.pth']
+    nets_path = ['checkpoint/best_SegNet1_ensemble.pth',
+                 'checkpoint/best_SegNet2_ensemble.pth',
+                 'checkpoint/best_SegNet3_ensemble.pth']
 
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
+    # registering the initial performance of the pre-trained networks
+    score_meters, ensemble_score = test(nets_, test_data, device=device)
+
+    # add performance of nets to plot
+    nets_score_dict = {"Segnet1": score_meters[0].value()[0].item(),
+                       "Segnet2": score_meters[1].value()[0].item(),
+                       "Segnet3": score_meters[2].value()[0].item(),
+                       "MajVote": ensemble_score.value()[0]}
+    add_visual_perform(writer, nets_score_dict, 0)
+
+    print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_ensemble):
-        print('epoch = {0:4d}/{1:4d}'.format(epoch, max_epoch_ensemble))
+        print('epoch = {0:4d}/{1:4d} training ensemble'.format(epoch, max_epoch_ensemble))
         for idx, _ in enumerate(nets_):
             dice_meters[idx].reset()
 
         # if epoch % 5 == 0:
         #     learning_rate_decay(optimizers, 0.95)
 
-        for _ in tqdm(range(max(len(labeled_loader_), len(unlabeled_loader_)))):  # max(len(labeled_loader_), len(unlabeled_loader_)
+        for _ in tqdm(range(max(len(labeled_loader_[0]), len(unlabeled_loader_)))):  # max(len(labeled_loader_), len(unlabeled_loader_)
             # === train with labeled data ===
-            imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
-            _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
+            _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, device, nets_, criterion)
+            # imgs, masks, _ = image_batch_generator(labeled_loader_, device=device)
+            # _, llost_list, dice_score = batch_labeled_loss_(imgs, masks, nets_, criterion)
 
             # train with unlabeled data
             imgs, _, _ = image_batch_generator(unlabeled_loader_, device=device)
@@ -311,36 +322,59 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
                 dice_meters[idx].add(dice_score[idx])
 
         print(
-            'train epoch {0:1d}/{1:d} baseline: enet_dice_score={2:.6f}, segnet_dice_score={3:.6f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-                dice_meters[1].value()[0], dice_meters[2].value()[0]))
+            'train epoch {0:1d}/{1:d} ensemble: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}'.format(
+                epoch + 1, max_epoch_baseline, dice_meters[0].value()[0].item(),
+                dice_meters[1].value()[0].item(), dice_meters[2].value()[0].item()))
 
         score_meters, ensemble_score = test(nets_, test_data, device=device)
 
+        # add performance of nets to plot
+        nets_score_dict = {"Segnet1": score_meters[0].value()[0].item(),
+                           "Segnet2": score_meters[1].value()[0].item(),
+                           "Segnet3": score_meters[2].value()[0].item(),
+                           "MajVote": ensemble_score.value()[0]}
+        add_visual_perform(writer, nets_score_dict, epoch + 1)
+
         print(
-            'val epoch {0:d}/{1:d} baseline: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}, with majorty_voting={5:.6f}'.format(
+            'val epoch {0:d}/{1:d} ensemble: segnet1_dice_score={2:.6f}, segnet2_dice_score={3:.6f}, segnet3_dice_score={4:.6f}, with majorty_voting={5:.6f}'.format(
                 epoch + 1,
-                max_epoch_pre,
+                max_epoch_baseline,
                 score_meters[0].value()[0].item(),
                 score_meters[1].value()[0].item(),
                 score_meters[2].value()[0].item(),
                 ensemble_score.value()[0]))
 
         cvs_writer.writerow({'Epoch': epoch + 1,
-                             'ENet_Score': score_meters[0].value()[0].item(),
-                             'SegNet_Score': score_meters[1].value()[0].item(),
+                             'SegNet1_Score': score_meters[0].value()[0].item(),
+                             'SegNet2_Score': score_meters[1].value()[0].item(),
+                             'SegNet3_Score': score_meters[2].value()[0].item(),
                              'MV_Score': ensemble_score.value()[0]})
+        rec_data = {'Epoch': epoch + 1,
+                    'SegNet1_Score': score_meters[0].value()[0].item(),
+                    'SegNet2_Score': score_meters[1].value()[0].item(),
+                    'SegNet3_Score': score_meters[2].value()[0].item(),
+                    'MV_Score': ensemble_score.value()[0]}
+        try:
+            if not os.path.isfile('baseline_03112018_segnet.csv'):
+                pd.DataFrame([rec_data]).to_csv('baseline_04112018_segnet.csv', header='column_names',
+                                                index=False, float_format='%.4f')
+            else:
+                pd.DataFrame([rec_data]).to_csv('baseline_04112018_segnet.csv', header=False,
+                                                index=False, float_format='%.4f', mode='a', )
+        except Exception as e:
+            print(e)
 
         historical_score_dict = save_models(nets_, nets_path, score_meters, epoch, historical_score_dict)
         if ensemble_score.value()[0] > historical_score_dict['jsd']:
             historical_score_dict['jsd'] = ensemble_score.value()[0]
 
-        records.append(historical_score_dict)
+            records.append(historical_score_dict)
 
-        try:
-            pd.DataFrame(records).to_csv('ensemblerecords.csv')
-        except Exception as e:
-            print(e)
+            try:
+                pd.DataFrame(records).to_csv('baseline_04112018_segnet_best_record.csv',
+                                             index=False, float_format='%.4f')
+            except Exception as e:
+                print(e)
 
         # visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
 
@@ -372,7 +406,7 @@ if __name__ == "__main__":
     elif args.baseline:
         # Baseline Training Stage
         print('STARTING THE BASELINE TRAINING STAGE')
-        baseline_file = open('baseline_03112018_segnet_outside.csv', 'w')
+        baseline_file = open('baseline_04112018_segnet_outside.csv', 'w')
         # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
         baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
         baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
@@ -386,7 +420,7 @@ if __name__ == "__main__":
     elif args.ensemble:
         # Ensemble Training Stage
         print('STARTING THE ENSEMBLE TRAINING STAGE')
-        ensemble_file = open('output_ensemble_31102018.csv', 'w')
+        ensemble_file = open('baseline_04112018_segnet_outside.csv', 'w')
         ensemble_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
         ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
         ensemble_writer.writeheader()
