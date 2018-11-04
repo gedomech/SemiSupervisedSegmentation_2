@@ -34,8 +34,8 @@ unlabeled_batch_size = 1
 val_batch_size = 1
 
 max_epoch_pre = 1
-max_epoch_baseline = 2
-max_epoch_ensemble = 2
+max_epoch_baseline = 100
+max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
