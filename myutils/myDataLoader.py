@@ -44,28 +44,43 @@ class ISICdata(Dataset):
         self.root = root
         self.csv_root = os.path.join(root,'ISIC_Segmenation_dataset_split')
         if self.mode=="full":
-            assert model in ('train', 'dev'), "the model should be always in 'train' or 'dev', given '%s'." % model
+            assert model in (
+            'train', 'dev'), "the model should be always in 'train', 'dev' and 'val', given '%s'." % model
             if self.model=="train":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'train.csv'))
             elif self.model=="dev":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'val.csv'))
+                img_gts_list = img_gts_list.ix[:int(len(img_gts_list) / 2)]
+            elif self.model == 'val':
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'val.csv'))
+                img_gts_list = img_gts_list.ix[int(len(img_gts_list) / 2):]
             else:
                 raise NotImplemented
         elif self.mode=="semi":
-            assert model in ('labeled', 'unlabeled', 'test'), "the model should be always in 'labeled', 'unlabeled' or 'test', given '%s'." % model
+            assert model in ('labeled', 'unlabeled', 'dev',
+                             'val'), "the model should be always in 'labeled', 'unlabeled' or 'test', given '%s'." % model
             if self.model=="labeled":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_labeled_tr.csv'))
             elif self.model=="unlabeled":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root,'random_unlabeled_tr.csv'))
-            elif self.model == "test":
+            elif self.model == "dev":
                 img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'random_test.csv'))
+                img_gts_list = img_gts_list.ix[:int(len(img_gts_list) / 2)]
+            elif self.model == "val":
+                img_gts_list = pd.read_csv(os.path.join(self.csv_root, 'random_test.csv'))
+                img_gts_list = img_gts_list.ix[int(len(img_gts_list) / 2):]
+            else:
+                raise NotImplementedError
 
         self.imgs = img_gts_list['img'].values
         self.gts = img_gts_list['label'].values
-        imgs = [x for x in os.listdir(os.path.join(self.root,'ISIC2018_Task1-2_Training_Input')) if x.find('jpg')>0]
-        gts = [x for x in os.listdir(os.path.join(self.root,'ISIC2018_Task1_Training_GroundTruth')) if x.find('png')>0]
-        self.imgs = ['ISIC2018_Task1-2_Training_Input/'+x for x in  self.imgs if x.split('/')[0] in imgs]
-        self.gts = ['ISIC2018_Task1_Training_GroundTruth/'+x.replace(' ','') for x in self.gts if x.split('/')[0].replace('_segmentation.png','.jpg').replace(' ','') in imgs]
+        imgs = [x for x in os.listdir(os.path.join(self.root, 'ISIC2018_Task1-2_Training_Input_temp')) if
+                x.find('jpg') > 0]
+        gts = [x for x in os.listdir(os.path.join(self.root, 'ISIC2018_Task1_Training_GroundTruth_temp')) if
+               x.find('png') > 0]
+        self.imgs = ['ISIC2018_Task1-2_Training_Input_temp/' + x for x in self.imgs if x.split('/')[0] in imgs]
+        self.gts = ['ISIC2018_Task1_Training_GroundTruth_temp/' + x.replace(' ', '') for x in self.gts if
+                    x.split('/')[0].replace('_segmentation.png', '.jpg').replace(' ', '') in imgs]
 
         assert len(self.imgs)==len(self.gts)
 

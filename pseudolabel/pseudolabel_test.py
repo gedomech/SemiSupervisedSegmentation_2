@@ -45,8 +45,10 @@ labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
                         dataAugment=False, equalize=Equalize)
 unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=True,
                           dataAugment=False, equalize=Equalize)
-test_data = ISICdata(root=root, model='test', mode='semi', transform=True,
-                     dataAugment=False, equalize=Equalize)
+dev_data = ISICdata(root=root, model='dev', mode='semi', transform=True,
+                    dataAugment=False, equalize=Equalize)
+val_data = ISICdata(root=root, model='val', mode='semi', transform=True,
+                    dataAugment=False, equalize=Equalize)
 
 labeled_loader_params = {'batch_size': labeled_batch_size,
                          'shuffle': True,
@@ -60,7 +62,8 @@ unlabeled_loader_params = {'batch_size': unlabeled_batch_size,
 
 labeled_data = DataLoader(labeled_data, **labeled_loader_params)
 unlabeled_data = DataLoader(unlabeled_data, **unlabeled_loader_params)
-test_data = DataLoader(test_data, **unlabeled_loader_params)
+dev_data = DataLoader(dev_data, **unlabeled_loader_params)
+val_data = DataLoader(val_data, **unlabeled_loader_params)
 
 ## networks and optimisers
 net = Enet(class_number)
@@ -72,9 +75,7 @@ optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
 ## loss
 class_weigth = [1 * 0.1, 3.53]
 class_weigth = torch.Tensor(class_weigth)
-criterion = CrossEntropyLoss2d(class_weigth).to(device) if (
-        torch.cuda.is_available() and use_cuda) else CrossEntropyLoss2d(
-    class_weigth)
+criterion = CrossEntropyLoss2d(class_weigth).to(device)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 historical_track= []
 
@@ -87,7 +88,7 @@ def pre_train(p):
     labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
     labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
     print('the length of the labeled dataset is: %d'%labeled_len)
-    best_validation_score = -1
+    best_dev_score = -1
 
     for epoch in range(max_epoch_pre):
 
@@ -102,19 +103,22 @@ def pre_train(p):
             loss.backward()
             optimizer.step()
 
-        [labeled_score, unlabeled_score, validation_score] = [evaluate(net, x, device) for x in
-                                                              (labeled_data, unlabeled_data, test_data)]
+        [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
+                                                                         (labeled_data, unlabeled_data, dev_data,
+                                                                          val_data)]
 
-        logging.info('pretrained stage: lab:%3f  unlab:%3f  val:%.3f'%(labeled_score,unlabeled_score,validation_score))
-        historical_track.append({'lab':labeled_score,'unlab':unlabeled_score,'val':validation_score,'epoch':epoch})
+        logging.info('pretrained stage: lab:%3f  unlab:%3f  dev:%3f   val:%.3f' % (
+        labeled_score, unlabeled_score, dev_score, validation_score))
+        historical_track.append(
+            {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
         pd.DataFrame(historical_track).to_csv(net_save_path.replace('pth','csv'))
 
-        if validation_score> best_validation_score:
+        if dev_score > best_dev_score:
             dict_to_save = {'labeled_dataloader': labeled_data,
                             'state_dict':net.state_dict()}
             torch.save(dict_to_save,net_save_path)
-            best_validation_score = validation_score
-    return net_save_path, best_validation_score
+            best_dev_score = dev_score
+    return net_save_path, best_dev_score
 
 
 
@@ -130,7 +134,7 @@ def train_baseline(net_, net_path_):
     net_.train()
     learning_rate_reset(optimizer, lr = 1e-5)
 
-    best_validation_score = -1
+    best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
@@ -152,16 +156,16 @@ def train_baseline(net_, net_path_):
             optimizer.zero_grad()
             total_loss[0].backward()
             optimizer.step()
-        [labeled_score, unlabeled_score, validation_score] = [evaluate(net, x, device) for x in
-                                                              (labeled_data, unlabeled_data, test_data)]
+        [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
+                                                                         (labeled_data, unlabeled_data, dev_data,
+                                                                          val_data)]
         semi_historical_track.append(
-            {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'epoch': epoch})
+            {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
         pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained','baseline').replace('pth','csv'))
 
-
-        if validation_score> best_validation_score:
+        if dev_score > best_dev_score:
             torch.save(net.state_dict(),net_path_.replace('pretrained','baseline'))
-            best_validation_score = validation_score
+            best_dev_score = dev_score
 
 
 
