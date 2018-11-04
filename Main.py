@@ -188,8 +188,8 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
 
-        # if epoch % 5 == 0:
-        #     learning_rate_decay(optimizers, 0.95)
+        if epoch % 5 == 0:
+            learning_rate_decay(optimizers, 0.95)
 
         # train with labeled data
         for _ in tqdm(range(max(len(labeled_loader_[0]), len(unlabeled_loader_)))):  # I need to optimize this
@@ -242,8 +242,6 @@ def train_baseline(nets_, nets_path_, labeled_loader_: list, unlabeled_loader_, 
                     'SegNet2_Score': score_meters[1].value()[0].item(),
                     'SegNet3_Score': score_meters[2].value()[0].item(),
                     'MV_Score': ensemble_score.value()[0]}
-        # pd.DataFrame([rec_data]).to_csv('baseline_03112018_segnet.csv',
-        #                                 index=False, float_format='%.4f')
 
         try:
             if not os.path.isfile('baseline_03112018_segnet.csv'):
