@@ -5,6 +5,7 @@ import sys
 
 import pandas as pd
 
+logging.basicConfig(format='%(levelname)s - %(module)s - %(message)s')
 logger = logging.getLogger('spam_application')
 logger.setLevel(logging.INFO)
 sys.path.extend([os.path.dirname(os.getcwd())])
