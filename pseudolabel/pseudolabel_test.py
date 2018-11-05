@@ -25,7 +25,7 @@ root = "../datasets/ISIC2018"
 class_number = 2
 lr = 1e-3
 weigth_decay = 1e-5
-lamda = 5e-2
+lamda = 1
 
 use_cuda = True
 device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
@@ -70,7 +70,6 @@ map_location=lambda storage, loc: storage
 net = Enet(class_number)
 net = net.to(device)
 
-map_location = lambda storage, loc: storage
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
 
 ## loss
@@ -129,7 +128,7 @@ def train_baseline(net_, net_path_):
     labeled_data = torch.load(net_path_,map_location=map_location )['labeled_dataloader']
     print('the length of the labeled dataset is: %d' % labeled_data.dataset.imgs.__len__())
     net_.train()
-    learning_rate_reset(optimizer, lr=1e-5)
+    learning_rate_reset(optimizer, lr=1e-6)
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
@@ -144,7 +143,7 @@ def train_baseline(net_, net_path_):
         semi_historical_track.append(
             {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
         # train with labeled data
-        for _ in tqdm(range(len(unlabeled_data))):  #
+        for _ in tqdm(range(len(labeled_data))):  #
 
             imgs, masks, _ = image_batch_generator(labeled_data, device=device)
             _, llost_list, _ = batch_labeled_loss_(imgs, masks, [net_], criterion)
@@ -174,10 +173,10 @@ if __name__ == "__main__":
     parser.add_argument('--pretrain', default=False)
     parser.add_argument('--baseline', default=True)
     args = parser.parse_args()
-    if args.pretrain:
+    if bool(args.pretrain):
         saved_path, pretrained_score = pre_train(args.p)
-        if args.baseline:
+        if bool(args.baseline):
             train_baseline(net, saved_path)
-    elif args.baseline:
+    elif bool(args.baseline):
         saved_path = 'enet_pretrained_%.1f.pth' % float(args.p)
         train_baseline(net, saved_path)

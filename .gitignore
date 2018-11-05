@@ -7,3 +7,11 @@
 
 # pre-trained models
 /checkpoint/modified*
+.idea/*
+checkpoint/
+datasets/
+rando*
+runs/
+.pytest_cache/
+myutils/.pytest_cache/
+myutils/__pycache__/
