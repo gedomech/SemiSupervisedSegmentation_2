@@ -163,6 +163,12 @@ def learning_rate_decay(optims, factor=0.95):
             param_group['lr'] = param_group['lr'] * factor
 
 
+def learning_rate_reset(optims, lr=1e-4):
+
+    for param_group in optims.param_groups:
+        param_group['lr'] = lr
+
+
 def map_(func,*list):
     return [*map(func,*list)]
 
@@ -335,3 +341,17 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+
+def evaluate(net, dataloader, device):
+    net.eval()
+    dice_meter = AverageValueMeter()
+    dice_meter.reset()
+    with torch.no_grad():
+        for i, (img, mask, path) in enumerate(dataloader):
+            img, mask = img.to(device), mask.to(device)
+            pred = net(img)
+            pred_mask = pred2segmentation(pred)
+            dice_meter.add(dice_loss(pred_mask, mask))
+
+    net.train()
+    return dice_meter.value()[0]
