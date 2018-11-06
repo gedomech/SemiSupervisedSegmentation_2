@@ -142,14 +142,15 @@ def pre_train(nets_, nets_path_, labeled_loader_):
 
         subsets_lengths = [len(x) for x in labeled_loader_]
 
-        # for _ in tqdm(range(max(subsets_lengths))):
-        #     # === train with labeled data ===
-        #     # _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, device, nets_, criterion)
+        for _ in tqdm(range(max(subsets_lengths))):
+            # === train with labeled data ===
+            _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, device, nets_, criterion)
+
         fold1_score_l, fold2_score_l, test_score_l = [], [], []
         for idx in idx_array: #range(len(nets_)):
             cv_idx = idx_array[idx_array != idx]
-            # [fold1_score, fold2_score, test_score] = [evaluate(nets_[idx], x, device) for x in
-            #                                                (labeled_loader_[cv_idx[0]], labeled_loader_[cv_idx[1]], test_data)]
+            [fold1_score, fold2_score, test_score] = [evaluate(nets_[idx], x, device) for x in
+                                                           (labeled_loader_[cv_idx[0]], labeled_loader_[cv_idx[1]], test_data)]
             fold1_score_l.append(fold1_score)
             fold2_score_l.append(fold2_score)
             test_score_l.append(test_score)
