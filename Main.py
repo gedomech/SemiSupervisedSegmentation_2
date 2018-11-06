@@ -468,12 +468,12 @@ if __name__ == "__main__":
     if args.pre_training:
         # Pre-training Stage
         print('STARTING THE PRE-TRAINING STAGE')
-        nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
-                      'checkpoint/best_UNet_pre-trained.pth',
-                      'checkpoint/best_SegNet_pre-trained.pth']
+        nets_path_ = ['checkpoint/SegNet1_pre-trained.pth',
+                      'checkpoint/SegNet2_pre-trained.pth',
+                      'checkpoint/SegNet3_pre-trained.pth']
         pre_train(nets,
                   nets_path_,
-                  labeled_data)
+                  [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3])
     elif args.baseline:
         # Baseline Training Stage
         print('STARTING THE BASELINE TRAINING STAGE')
