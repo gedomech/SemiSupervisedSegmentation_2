@@ -14,15 +14,21 @@ from myutils.myUtils import *
 
 import csv
 import argparse
+import logging
+
+logging.basicConfig(filename='terminal_output.log', level=logging.INFO)
+# logging.basicConfig(format='%(levelname)s - %(module)s - %(message)s')
+logger = logging.getLogger('spam_application')
+# logger.setLevel(logging.INFO)
 
 warnings.filterwarnings('ignore')
+writer = SummaryWriter()
 
 # torch.set_num_threads(1)  # set by deafault to 1
 root = "datasets/ISIC2018"
-writer = SummaryWriter()
 
 class_number = 2
-lr = 1e-5
+lr = 1e-6
 weigth_decay = 1e-6
 lamda = 5e-2
 
@@ -33,7 +39,7 @@ labeled_batch_size = 1
 unlabeled_batch_size = 1
 val_batch_size = 1
 
-max_epoch_pre = 1
+max_epoch_pre = 3
 max_epoch_baseline = 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
@@ -109,54 +115,113 @@ historical_score_dict = {
     'mv': 0,
     'jsd': 0}
 
+# historical_track = []
+
 from functools import partial
 
 
-def pre_train():
+def pre_train(nets_, nets_path_, labeled_loader_):
     """
     This function performs the training with the unlabeled images.
     """
-    map_(lambda x: x.train(), nets)
+    map_(lambda x: x.train(), nets_)
+    idx_array = np.arange(len(nets_))
 
     global historical_score_dict
 
-    nets_path = ['checkpoint/best_ENet_pre-trained.pth',
-                 'checkpoint/best_UNet_pre-trained.pth',
-                 'checkpoint/best_SegNet_pre-trained.pth']
     dice_meters = [AverageValueMeter(), AverageValueMeter(), AverageValueMeter()]
 
     from multiprocessing import Pool
 
     for epoch in range(max_epoch_pre):
         map_(lambda x: x.reset(), dice_meters)
-
+        # fold1_score, fold2_score, test_score = None, None, None
+        fold1_score, fold2_score, test_score = 0, 0, 0
         if epoch % 5 == 0:
             learning_rate_decay(optimizers, 0.95)
 
-        for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
-            img, mask = img.to(device), mask.to(device)
+        subsets_lengths = [len(x) for x in labeled_loader_]
 
-            p_forward = partial(s_forward_backward, imgs=img, masks=mask, criterion=criterion)
-            dices = list(Pool().starmap(p_forward, zip(nets, optimizers)))
-            map_(lambda x, y: x.add(y), dice_meters, dices)
+        # for _ in tqdm(range(max(subsets_lengths))):
+        #     # === train with labeled data ===
+        #     # _, llost_list, dice_score = batch_labeled_loss_customized(labeled_loader_, device, nets_, criterion)
+        fold1_score_l, fold2_score_l, test_score_l = [], [], []
+        for idx in idx_array: #range(len(nets_)):
+            cv_idx = idx_array[idx_array != idx]
+            # [fold1_score, fold2_score, test_score] = [evaluate(nets_[idx], x, device) for x in
+            #                                                (labeled_loader_[cv_idx[0]], labeled_loader_[cv_idx[1]], test_data)]
+            fold1_score_l.append(fold1_score)
+            fold2_score_l.append(fold2_score)
+            test_score_l.append(test_score)
 
-        print(
-            'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.6f}, unet_dice_score: {3:.6f}, segnet_dice_score: {4:.6f}'.format(
-                epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
-                dice_meters[1].value()[0], dice_meters[2].value()[0]))
+        history_score_dict = save_models(nets_, nets_path_, test_score_l, epoch, historical_score_dict)
+        val_score_l = [(x + y)/2 for x, y in zip(fold1_score_l, fold2_score_l)]
+        # historical_track = []
+        for idx_ in range(len(nets_path_)):
+            net_name = nets_path_[idx_].split('/')[-1].split('_')[0]
 
-        score_meters, ensemble_score = test(nets, test_data, device=device)
+            logging.info('epoch %d pretrained stage %s: fold1_score:%3f  fold2_score:%3f  val:%3f  test:%3f' % (
+                epoch, net_name, fold1_score_l[idx_], fold2_score_l[idx_], val_score_l[idx_], test_score_l[idx_]))
+            historical_track = {'fold1_score': fold1_score_l[idx_],
+                                'fold2_score': fold2_score_l[idx_],
+                                'val': val_score_l[idx_],
+                                'test_score': test_score_l[idx_],
+                                'epoch': epoch+1}
+            try:
+                if not os.path.isfile(nets_path_[idx_].replace('pth', 'csv')):
+                    pd.DataFrame([historical_track]).to_csv(nets_path_[idx_].replace('pth', 'csv'), header='column_names',
+                                                            index=False, float_format='%.4f')
+                else:
+                    pd.DataFrame([historical_track]).to_csv(nets_path_[idx_].replace('pth', 'csv'), header=False,
+                                                            index=False, float_format='%.4f', mode='a', )
+            except Exception as e:
+                print(e)
 
-        print(
-            'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.6f}, unet_dice_score: {3:.6f}, segnet_dice_score: {4:.6f}, with majorty voting: {5:.6f}'.format(
-                epoch + 1,
-                max_epoch_pre,
-                score_meters[0].value()[0].item(),
-                score_meters[1].value()[0].item(),
-                score_meters[2].value()[0].item(),
-                ensemble_score.value()[0]))
+            score = val_score_l[idx_]
+            if (idx == 0) and (history_score_dict[nets_names[idx]] < score):
+                history_score_dict[nets_names[idx]] = score
+                logging.info('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
+                                                                                          history_score_dict[
+                                                                                              nets_names[idx]]))
+                torch.save(nets_[idx].state_dict(), nets_path_[idx])
 
-        historical_score_dict = save_models(nets, nets_path, score_meters, epoch, historical_score_dict)
+            elif (idx == 1) and (history_score_dict[nets_names[idx]] < score):
+                history_score_dict[nets_names[idx]] = score
+                logging.info('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
+                                                                                          history_score_dict[
+                                                                                              nets_names[idx]]))
+                torch.save(nets_[idx].state_dict(), nets_path_[idx])
+
+            elif (idx == 2) and (history_score_dict[nets_names[idx]] < score):
+                history_score_dict[nets_names[idx]] = score
+                logging.info('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
+                                                                                          history_score_dict[
+                                                                                              nets_names[idx]]))
+                torch.save(nets_[idx].state_dict(), nets_path_[idx])
+
+
+
+            # p_forward = partial(s_forward_backward, imgs=img, masks=mask, criterion=criterion)
+            # dices = list(Pool().starmap(p_forward, zip(nets_, optimizers)))
+            # map_(lambda x, y: x.add(y), dice_meters, dices)
+
+        # print(
+        #     'traing epoch {0:1d}/{1:d} pre-training: enet_dice_score: {2:.6f}, unet_dice_score: {3:.6f}, segnet_dice_score: {4:.6f}'.format(
+        #         epoch + 1, max_epoch_pre, dice_meters[0].value()[0],
+        #         dice_meters[1].value()[0], dice_meters[2].value()[0]))
+        #
+        # score_meters, ensemble_score = test(nets_, test_data, device=device)
+        #
+        # print(
+        #     'val epoch {0:d}/{1:d} pre-training: enet_dice_score: {2:.6f}, unet_dice_score: {3:.6f}, segnet_dice_score: {4:.6f}, with majorty voting: {5:.6f}'.format(
+        #         epoch + 1,
+        #         max_epoch_pre,
+        #         score_meters[0].value()[0].item(),
+        #         score_meters[1].value()[0].item(),
+        #         score_meters[2].value()[0].item(),
+        #         ensemble_score.value()[0]))
+        #
+        # historical_score_dict = save_models(nets_, nets_path_, score_meters, epoch, historical_score_dict)
 
         # visualize(writer, nets_, unlabeled_loader_, 8, epoch, randomly=False)
 
@@ -380,56 +445,61 @@ def train_ensemble(nets_, nets_path_, labeled_loader_, unlabeled_loader_, cvs_wr
 
 
 if __name__ == "__main__":
-    PRE_TRAINING = False
-    BASELINE = False
-    ENSEMBLE = False
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--pre-training", type=str2bool, nargs='?', const=False, default=PRE_TRAINING,
-                        help="Whether to pre-train the models.")
-    parser.add_argument("--baseline", type=str2bool, nargs='?', const=False, default=BASELINE,
-                        help="Whether to train the baseline models.")
-    parser.add_argument("--ensemble", type=str2bool, nargs='?', const=False, default=ENSEMBLE,
-                        help="Whether to train the ensemble models.")
-
-    args = parser.parse_args()
-
-    # nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
-    #               # 'checkpoint/best_UNet_pre-trained.pth',
-    #               'checkpoint/best_SegNet_pre-trained.pth']
-    nets_path_ = 3*['checkpoint/best_SegNet_pre-trained.pth']
-
-    if args.pre_training:
-        # Pre-training Stage
-        print('STARTING THE PRE-TRAINING STAGE')
-        pre_train()
-    elif args.baseline:
-        # Baseline Training Stage
-        print('STARTING THE BASELINE TRAINING STAGE')
-        baseline_file = open('baseline_04112018_segnet_outside.csv', 'w')
-        # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
-        baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
-        baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
-        baseline_writer.writeheader()
-        train_baseline(nets,
-                       nets_path_,
-                       [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
-                       unlabeled_data,
-                       baseline_writer)
-        # train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
-    elif args.ensemble:
-        # Ensemble Training Stage
-        print('STARTING THE ENSEMBLE TRAINING STAGE')
-        ensemble_file = open('ensemble_04112018_segnet_outside.csv', 'w')
-        ensemble_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
-        ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
-        ensemble_writer.writeheader()
-        train_baseline(nets,
-                       nets_path_,
-                       [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
-                       unlabeled_data,
-                       ensemble_writer)
-        # train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
+    # PRE_TRAINING = False
+    # BASELINE = False
+    # ENSEMBLE = False
+    #
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--pre-training", type=str2bool, nargs='?', const=False, default=PRE_TRAINING,
+    #                     help="Whether to pre-train the models.")
+    # parser.add_argument("--baseline", type=str2bool, nargs='?', const=False, default=BASELINE,
+    #                     help="Whether to train the baseline models.")
+    # parser.add_argument("--ensemble", type=str2bool, nargs='?', const=False, default=ENSEMBLE,
+    #                     help="Whether to train the ensemble models.")
+    #
+    # args = parser.parse_args()
+    #
+    # # nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
+    # #               # 'checkpoint/best_UNet_pre-trained.pth',
+    # #               'checkpoint/best_SegNet_pre-trained.pth']
+    # nets_path_ = 3*['checkpoint/best_SegNet_pre-trained.pth']
+    #
+    # if args.pre_training:
+    #     # Pre-training Stage
+    #     print('STARTING THE PRE-TRAINING STAGE')
+    #     nets_path_ = ['checkpoint/best_ENet_pre-trained.pth',
+    #                   'checkpoint/best_UNet_pre-trained.pth',
+    #                   'checkpoint/best_SegNet_pre-trained.pth']
+    #     pre_train(nets,
+    #               nets_path_,
+    #               labeled_data)
+    # elif args.baseline:
+    #     # Baseline Training Stage
+    #     print('STARTING THE BASELINE TRAINING STAGE')
+    #     baseline_file = open('baseline_04112018_segnet_outside.csv', 'w')
+    #     # baseline_fields = ['Epoch', 'ENet_Score', 'SegNet_Score', 'MV_Score']
+    #     baseline_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
+    #     baseline_writer = csv.DictWriter(baseline_file, fieldnames=baseline_fields)
+    #     baseline_writer.writeheader()
+    #     train_baseline(nets,
+    #                    nets_path_,
+    #                    [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
+    #                    unlabeled_data,
+    #                    baseline_writer)
+    #     # train_baseline(nets, nets_path_, labeled_data, unlabeled_data, baseline_writer)
+    # elif args.ensemble:
+    #     # Ensemble Training Stage
+    #     print('STARTING THE ENSEMBLE TRAINING STAGE')
+    #     ensemble_file = open('ensemble_04112018_segnet_outside.csv', 'w')
+    #     ensemble_fields = ['Epoch', 'SegNet1_Score', 'SegNet2_Score', 'SegNet3_Score', 'MV_Score']
+    #     ensemble_writer = csv.DictWriter(ensemble_file, fieldnames=ensemble_fields)
+    #     ensemble_writer.writeheader()
+    #     train_baseline(nets,
+    #                    nets_path_,
+    #                    [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3],
+    #                    unlabeled_data,
+    #                    ensemble_writer)
+    #     # train_ensemble(nets, nets_path_, labeled_data, unlabeled_data, ensemble_writer)
 
     # baseline_writer = None
     # nets_path_ = 3 * ['checkpoint/best_SegNet_pre-trained.pth']
@@ -439,3 +509,10 @@ if __name__ == "__main__":
     #                unlabeled_data,
     #                baseline_writer)
 
+    print('STARTING THE PRE-TRAINING STAGE')
+    nets_path_ = ['checkpoint/SegNet1_pre-trained.pth',
+                  'checkpoint/SegNet2_pre-trained.pth',
+                  'checkpoint/SegNet3_pre-trained.pth']
+    pre_train(nets,
+              nets_path_,
+              [labeled_data_Segnet1, labeled_data_Segnet2, labeled_data_Segnet3])
