@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import argparse
+import logging
 
 import torchvision.utils as vutils
 from tensorboardX import SummaryWriter
@@ -92,23 +93,28 @@ def save_models(nets_, nets_path_, nets_names, score_meters=None, epoch=0, histo
     :return:
     """
     history_score_dict['epoch'] = epoch+1
+    score = 0
 
     for idx, net_i in enumerate(nets_):
+        if isinstance(score_meters, AverageValueMeter):
+            score = score_meters[idx].value()[0].item()
+        elif isinstance(score_meters, list):
+            score = score_meters[idx]
 
-        if (idx == 0) and ( history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
-            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0].item()
+        if (idx == 0) and ( history_score_dict[nets_names[idx]] < score):
+            history_score_dict[nets_names[idx]] = score
             print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
                                                                                history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
-        elif (idx == 1) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
-            history_score_dict[nets_names[idx]] = score_meters[idx].value()[0].item()
+        elif (idx == 1) and (history_score_dict[nets_names[idx]] < score):
+            history_score_dict[nets_names[idx]] = score
             print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
                                                                                history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
 
-        elif (idx == 2) and (history_score_dict[nets_names[idx]] < score_meters[idx].value()[0]):
-            history_score_dict[nets_names[idx]]= score_meters[idx].value()[0].item()
+        elif (idx == 2) and (history_score_dict[nets_names[idx]] < score):
+            history_score_dict[nets_names[idx]]= score
             print('The highest dice score for {} is {:.3f} in the test'.format(nets_names[idx],
                                                                                history_score_dict[nets_names[idx]]))
             torch.save(net_i.state_dict(), nets_path_[idx])
