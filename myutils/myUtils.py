@@ -92,7 +92,7 @@ def save_models(nets_, nets_path_, nets_names, score_meters=None, epoch=0, histo
     :param history_score_dict:
     :return:
     """
-    history_score_dict['epoch'] = epoch+1
+    history_score_dict['epoch'] = epoch + 1
     score = 0
 
     for idx, net_i in enumerate(nets_):
