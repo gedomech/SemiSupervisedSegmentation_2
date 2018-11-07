@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader
 
 from myutils.myLoss import JensenShannonDivergence
 
+import shutil
+
 
 def colormap(n):
     cmap=np.zeros([n, 3]).astype(np.uint8)
@@ -313,3 +315,8 @@ def evaluate(net, dataloader, device):
     net.train()
     return dice_meter.value()[0]
 
+
+def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, 'best_model_'+filename)
