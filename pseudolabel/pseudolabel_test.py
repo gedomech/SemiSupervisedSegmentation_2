@@ -116,11 +116,14 @@ def pre_train(p):
         save_checkpoint({
             'epoch': epoch + 1,
             'arch': net_save_path.split('_')[0],
-            'lab': labeled_score,
-            'state_dict': net.state_dict(),
+            'labeled_score': labeled_score,
+            'unlabeled_score': unlabeled_score,
+            'validation_score': validation_score,
             'best_dev_score': best_dev_score,
+            'state_dict': net.state_dict(),
             'optimizer': optimizer.state_dict(),
             'scheduler': scheduler.state_dict(),
+            'labeled_dataloader': labeled_data,
         }, is_best, filename=net_save_path)
 
         # if dev_score > best_dev_score:
@@ -137,16 +140,40 @@ def train_baseline(net_, net_path_):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
     #  loading pre-trained models
-    net_.load_state_dict(torch.load(net_path_, map_location= map_location)['state_dict'])
-    labeled_data = torch.load(net_path_,map_location=map_location )['labeled_dataloader']
+    if os.path.isfile(net_path_):
+        print("=> loading checkpoint '{}'".format(net_path_))
+        checkpoint = torch.load(net_path_)
+        start_epoch = checkpoint['epoch']
+        arch_name = checkpoint['arch']
+        labeled_score = checkpoint['labeled_score']
+        unlabeled_score = checkpoint['unlabeled_score']
+        validation_score = checkpoint['validation_score']
+        best_dev_score = checkpoint['best_dev_score']
+        net_.load_state_dict(checkpoint['state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        labeled_data = checkpoint['labeled_dataloader']
+        print("=> {} checkpoint of arch '{}' at epoch {}: lab:%3f, unlab:%, dev:%3f,  val:%.3f".format(net_path_,
+                                                                                                       arch_name,
+                                                                                                       start_epoch,
+                                                                                                       labeled_score,
+                                                                                                       unlabeled_score,
+                                                                                                       best_dev_score,
+                                                                                                       validation_score))
+    else:
+        print("=> no checkpoint found at '{}'".format(net_path_))
+
+    # net_.load_state_dict(torch.load(net_path_, map_location= map_location)['state_dict'])
+    # labeled_data = torch.load(net_path_,map_location=map_location )['labeled_dataloader']
     print('the length of the labeled dataset is: %d' % labeled_data.dataset.imgs.__len__())
     net_.train()
     learning_rate_reset(optimizer, lr=1e-6)
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
+    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
     for epoch in range(max_epoch_baseline):
         print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
         scheduler.step()
@@ -190,7 +217,8 @@ if __name__ == "__main__":
     if bool(args.pretrain):
         saved_path, pretrained_score = pre_train(args.p)
         if bool(args.baseline):
+            saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
             train_baseline(net, saved_path)
     elif bool(args.baseline):
-        saved_path = 'enet_pretrained_%.1f.pth' % float(args.p)
+        saved_path = 'best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
         train_baseline(net, saved_path)
