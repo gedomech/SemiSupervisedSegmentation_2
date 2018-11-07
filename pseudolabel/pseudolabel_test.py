@@ -88,10 +88,10 @@ def pre_train(p):
     labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
     print('the length of the labeled dataset is: %d' % labeled_len)
     best_dev_score = -1
-    schduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 150, 175], gamma=0.2)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 150, 175], gamma=0.2)
 
     for epoch in range(max_epoch_pre):
-        schduler.step()
+        scheduler.step()
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
             optimizer.zero_grad()
@@ -110,11 +110,25 @@ def pre_train(p):
             {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
         pd.DataFrame(historical_track).to_csv(net_save_path.replace('pth', 'csv'))
 
-        if dev_score > best_dev_score:
-            dict_to_save = {'labeled_dataloader': labeled_data,
-                            'state_dict': net.state_dict()}
-            torch.save(dict_to_save, net_save_path)
-            best_dev_score = dev_score
+        # remember best acc@1 and save checkpoint
+        is_best = dev_score > best_dev_score  # acc1 > best_acc1
+        best_dev_score = max(dev_score, best_dev_score)  # best_acc1 = max(acc1, best_acc1)
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'arch': net_save_path.split('_')[0],
+            'lab': labeled_score,
+            'state_dict': net.state_dict(),
+            'best_dev_score': best_dev_score,
+            'optimizer': optimizer.state_dict(),
+            'scheduler': scheduler.state_dict(),
+        }, is_best, filename=net_save_path)
+
+        # if dev_score > best_dev_score:
+        #     dict_to_save = {'labeled_dataloader': labeled_data,
+        #                     'state_dict': net.state_dict()}
+        #     torch.save(dict_to_save, net_save_path)
+        #     best_dev_score = dev_score
+
     return net_save_path, best_dev_score
 
 
