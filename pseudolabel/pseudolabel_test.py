@@ -91,8 +91,8 @@ def pre_train(p):
     best_dev_score = -1
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 150, 175], gamma=0.2)
 
-    pdf_lab = backend_pdf.PdfPages('segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('segmentation_tracker_unlabele.pdf')
+    pdf_lab = backend_pdf.PdfPages('pretrain_segmentation_tracker_labeled.pdf')
+    pdf_unlab = backend_pdf.PdfPages('pretrain_segmentation_tracker_unlabele.pdf')
 
     for epoch in range(max_epoch_pre):
         scheduler.step()
@@ -188,6 +188,9 @@ def train_baseline(net_, net_path_):
     net_.train()
     learning_rate_reset(optimizer, lr=1e-6)
 
+    pdf_lab = backend_pdf.PdfPages('baseline_segmentation_tracker_labeled.pdf')
+    pdf_unlab = backend_pdf.PdfPages('baseline_segmentation_tracker_unlabeled.pdf')
+
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
     # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
@@ -215,29 +218,36 @@ def train_baseline(net_, net_path_):
             total_loss[0].backward()
             optimizer.step()
 
+        if epoch % 10 == 0:
+            _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
+                 zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
+
         pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv'))
 
         if dev_score > best_dev_score:
             torch.save(net.state_dict(), net_path_.replace('pretrained', 'baseline'))
             best_dev_score = dev_score
 
+    pdf_lab.close()
+    pdf_unlab.close()
+
 
 if __name__ == "__main__":
     # Pre-training Stage
-    # import argparse
-    #
-    # parser = argparse.ArgumentParser(description='split the training data')
-    # parser.add_argument('--p', default=0.8)
-    # parser.add_argument('--pretrain', default=False)
-    # parser.add_argument('--baseline', default=True)
-    # args = parser.parse_args()
-    # if bool(args.pretrain):
-    #     saved_path, pretrained_score = pre_train(args.p)
-    #     if bool(args.baseline):
-    #         saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
-    #         train_baseline(net, saved_path)
-    # elif bool(args.baseline):
-    #     saved_path = 'best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
-    #     train_baseline(net, saved_path)
+    import argparse
 
-    saved_path, pretrained_score = pre_train(0.1)
+    parser = argparse.ArgumentParser(description='split the training data')
+    parser.add_argument('--p', default=0.8)
+    parser.add_argument('--pretrain', default=False)
+    parser.add_argument('--baseline', default=True)
+    args = parser.parse_args()
+    if bool(args.pretrain):
+        saved_path, pretrained_score = pre_train(args.p)
+        if bool(args.baseline):
+            saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
+            train_baseline(net, saved_path)
+    elif bool(args.baseline):
+        saved_path = 'best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
+        train_baseline(net, saved_path)
+
+    # saved_path, pretrained_score = pre_train(0.1)
