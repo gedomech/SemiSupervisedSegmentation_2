@@ -43,7 +43,7 @@ labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
                         dataAugment=False, equalize=Equalize)
 unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=True,
                           dataAugment=False, equalize=Equalize)
-test_data = ISICdata(root=root, model='test', mode='semi', transform=True,
+test_data = ISICdata(root=root, model='val', mode='semi', transform=True,
                      dataAugment=False, equalize=Equalize)
 
 labeled_loader_params = {'batch_size': labeled_batch_size,
@@ -256,8 +256,16 @@ if __name__ == "__main__":
     # pre_train()
     # print("Baseline Training Stage")
     # Baseline Training Stage
-    nets_path = ['checkpoint/best_ENet_pre-trained.pth',
-                 'checkpoint/best_UNet_pre-trained.pth',
-                 'checkpoint/best_SegNet_pre-trained.pth']
-    # print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
-    train_baseline(nets, nets_path, labeled_data, unlabeled_data)
+    # nets_path = ['checkpoint/best_ENet_pre-trained.pth',
+    #              'checkpoint/best_UNet_pre-trained.pth',
+    #              'checkpoint/best_SegNet_pre-trained.pth']
+    # # print("CALLING train_baseline(nets, nets_path, labeled_data, unlabeled_data)")
+    # train_baseline(nets, nets_path, labeled_data, unlabeled_data)
+
+    pretrain_file = 'pseudolabel/enet_pretrained_0.1.csv'
+    baseline_file = 'pseudolabel/best_model_enet_baseline_0.1.csv'
+    plot_from_csvfile(pretrain_file, baseline_file, delim=',')
+
+    pretrain_file = 'pseudolabel/enet_pretrained_0.2.csv'
+    baseline_file = 'pseudolabel/best_model_enet_baseline_0.2.csv'
+    plot_from_csvfile(pretrain_file, baseline_file, delim=',')
