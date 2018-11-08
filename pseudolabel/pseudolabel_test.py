@@ -118,7 +118,8 @@ def pre_train(p):
     return net_save_path, best_dev_score
 
 
-def train_baseline(net_, net_path_):
+def train_baseline(net_, net_path_,separete_backpr ='False'):
+    assert separete_backpr in ('True', 'False')
     semi_historical_track = []
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
@@ -147,17 +148,26 @@ def train_baseline(net_, net_path_):
 
             imgs, masks, _ = image_batch_generator(labeled_data, device=device)
             _, llost_list, _ = batch_labeled_loss_(imgs, masks, [net_], criterion)
+            if separete_backpr=='True':
+                optimizer.zero_grad()
+                llost_list[0].backward()
+                optimizer.step()
 
             # train with unlabeled data
             imgs, _, _ = image_batch_generator(unlabeled_data, device=device)
             pseudolabel, predictions = get_mv_based_labels(imgs, [net_])
             ulost_list = cotraining(predictions, pseudolabel, [net_], criterion, device)
-            total_loss = [x + lamda * y for x, y in zip(llost_list, ulost_list)]
-            optimizer.zero_grad()
-            total_loss[0].backward()
-            optimizer.step()
+            if separete_backpr=='True':
+                optimizer.zero_grad()
+                ulost_list[0].backward()
+                optimizer.step()
+            if not separete_backpr=='True':
+                total_loss = [x + lamda * y for x, y in zip(llost_list, ulost_list)]
+                optimizer.zero_grad()
+                total_loss[0].backward()
+                optimizer.step()
 
-        pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv'))
+        pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv').split('.csv')[0]+'_separate_'+str(separete_backpr)+'.csv')
 
         if dev_score > best_dev_score:
             torch.save(net.state_dict(), net_path_.replace('pretrained', 'baseline'))
@@ -169,14 +179,15 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='split the training data')
-    parser.add_argument('--p', default=0.8)
-    parser.add_argument('--pretrain', default=False)
-    parser.add_argument('--baseline', default=True)
+    parser.add_argument('--p', default=0.5)
+    parser.add_argument('--pretrain', default='False')
+    parser.add_argument('--baseline', default='True')
+    parser.add_argument('--separate_backpro', default='False')
     args = parser.parse_args()
-    if bool(args.pretrain):
+    if args.pretrain=='True':
         saved_path, pretrained_score = pre_train(args.p)
-        if bool(args.baseline):
+        if args.baseline==True:
             train_baseline(net, saved_path)
-    elif bool(args.baseline):
+    elif args.baseline=='True':
         saved_path = 'enet_pretrained_%.1f.pth' % float(args.p)
-        train_baseline(net, saved_path)
+        train_baseline(net, saved_path, args.separate_backpro)

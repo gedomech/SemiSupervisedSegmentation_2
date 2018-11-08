@@ -1,7 +1,8 @@
 # coding=utf-8
 import os
 from multiprocessing import Pool
-ps = [0.1, 0.2, 0.4, 0.6,0.8,1]
+ps = [0.4]
+s = ['True', 'False']
 
 class iterator_:
     def __init__(self,list) -> None:
@@ -16,12 +17,13 @@ class iterator_:
             return self.iter.__next__()[1]
 
 
-GPU = iterator_([0, 1])
+GPU = iterator_([1])
 
 
 cmds = []
 for p in ps:
-    cmds.append('OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES=%d python pseudolabel_test.py --p %.2f --pretrain True --baseline False '%(GPU(), p))
+    for s_ in s:
+        cmds.append('OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES=%d python pseudolabel_test.py --p %.2f --pretrain False --separate_backpro %s'%(GPU(), p,s_))
 print(cmds)
 
 P = Pool(1)
