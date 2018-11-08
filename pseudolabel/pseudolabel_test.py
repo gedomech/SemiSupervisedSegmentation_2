@@ -4,6 +4,7 @@ import os
 import sys
 
 import pandas as pd
+from matplotlib.backends import backend_pdf
 
 logging.basicConfig(format='%(levelname)s - %(module)s - %(message)s')
 logger = logging.getLogger('spam_application')
@@ -52,7 +53,7 @@ val_data = ISICdata(root=root, model='val', mode='semi', transform=True,
                     dataAugment=False, equalize=Equalize)
 
 labeled_loader_params = {'batch_size': labeled_batch_size,
-                         'shuffle': True,
+                         'shuffle': False,  # True
                          'num_workers': number_workers,
                          'pin_memory': True}
 
@@ -90,6 +91,9 @@ def pre_train(p):
     best_dev_score = -1
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 150, 175], gamma=0.2)
 
+    pdf_lab = backend_pdf.PdfPages('segmentation_tracker_labeled.pdf')
+    pdf_unlab = backend_pdf.PdfPages('segmentation_tracker_unlabele.pdf')
+
     for epoch in range(max_epoch_pre):
         scheduler.step()
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
@@ -99,6 +103,17 @@ def pre_train(p):
             loss = criterion(pred, mask.squeeze(1))
             loss.backward()
             optimizer.step()
+
+        if epoch % 10 == 0:
+            _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
+                 zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
+            #
+            # if epoch == 1:
+
+            # save_segm2pdf(pred, mask, labeled_data.dataset.imgs[:labeled_batch_size], device pdf, epoch)
+
+                # pdf_lab.close()
+                # pdf_unlab.close()
 
         [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
                                                                          (labeled_data, unlabeled_data, dev_data,
@@ -131,6 +146,8 @@ def pre_train(p):
         #                     'state_dict': net.state_dict()}
         #     torch.save(dict_to_save, net_save_path)
         #     best_dev_score = dev_score
+    pdf_lab.close()
+    pdf_unlab.close()
 
     return net_save_path, best_dev_score
 
@@ -207,18 +224,20 @@ def train_baseline(net_, net_path_):
 
 if __name__ == "__main__":
     # Pre-training Stage
-    import argparse
+    # import argparse
+    #
+    # parser = argparse.ArgumentParser(description='split the training data')
+    # parser.add_argument('--p', default=0.8)
+    # parser.add_argument('--pretrain', default=False)
+    # parser.add_argument('--baseline', default=True)
+    # args = parser.parse_args()
+    # if bool(args.pretrain):
+    #     saved_path, pretrained_score = pre_train(args.p)
+    #     if bool(args.baseline):
+    #         saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
+    #         train_baseline(net, saved_path)
+    # elif bool(args.baseline):
+    #     saved_path = 'best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
+    #     train_baseline(net, saved_path)
 
-    parser = argparse.ArgumentParser(description='split the training data')
-    parser.add_argument('--p', default=0.8)
-    parser.add_argument('--pretrain', default=False)
-    parser.add_argument('--baseline', default=True)
-    args = parser.parse_args()
-    if bool(args.pretrain):
-        saved_path, pretrained_score = pre_train(args.p)
-        if bool(args.baseline):
-            saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
-            train_baseline(net, saved_path)
-    elif bool(args.baseline):
-        saved_path = 'best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
-        train_baseline(net, saved_path)
+    saved_path, pretrained_score = pre_train(0.1)
