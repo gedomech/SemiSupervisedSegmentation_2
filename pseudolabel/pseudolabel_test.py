@@ -154,11 +154,17 @@ def pre_train(p):
     return net_save_path, best_dev_score
 
 
-def train_baseline(net_, net_path_, resume=False):
+def train_baseline(p, net_, net_path_, resume=False):
     semi_historical_track = []
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
+    global labeled_data
+    labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
+    labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
+    labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
+    print('the length of the labeled dataset is: %d' % labeled_len)
+
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
     #  loading pre-trained models
     if resume and os.path.isfile(net_path_):
