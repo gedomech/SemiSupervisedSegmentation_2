@@ -16,7 +16,7 @@ class iterator_:
             return self.iter.__next__()[1]
 
 
-GPU = iterator_([1, 2])
+GPU = iterator_([0, 1])
 
 
 cmds = []
