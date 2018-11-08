@@ -12,6 +12,7 @@ logger.setLevel(logging.INFO)
 sys.path.extend([os.path.dirname(os.getcwd())])
 from myutils.myDataLoader import ISICdata
 from myutils.myENet import Enet
+from myutils.myNetworks import SegNet
 from myutils.myLoss import CrossEntropyLoss2d
 import warnings
 from tqdm import tqdm
@@ -68,7 +69,8 @@ dev_data = DataLoader(dev_data, **unlabeled_loader_params)
 val_data = DataLoader(val_data, **unlabeled_loader_params)
 map_location=lambda storage, loc: storage
 ## networks and optimisers
-net = Enet(class_number)
+# net = Enet(class_number)
+net = SegNet(class_number)
 net = net.to(device)
 
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
@@ -152,14 +154,14 @@ def pre_train(p):
     return net_save_path, best_dev_score
 
 
-def train_baseline(net_, net_path_):
+def train_baseline(net_, net_path_, resume=False):
     semi_historical_track = []
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
     #  loading pre-trained models
-    if os.path.isfile(net_path_):
+    if resume and os.path.isfile(net_path_):
         print("=> loading checkpoint '{}'".format(net_path_))
         checkpoint = torch.load(net_path_)
         start_epoch = checkpoint['epoch']
@@ -188,8 +190,8 @@ def train_baseline(net_, net_path_):
     net_.train()
     learning_rate_reset(optimizer, lr=1e-6)
 
-    pdf_lab = backend_pdf.PdfPages('baseline_segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('baseline_segmentation_tracker_unlabeled.pdf')
+    pdf_lab = backend_pdf.PdfPages('results/baseline_scratch/baseline_segmentation_tracker_labeled.pdf')
+    pdf_unlab = backend_pdf.PdfPages('results/baseline_scratch/baseline_segmentation_tracker_unlabeled.pdf')
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
@@ -226,7 +228,7 @@ def train_baseline(net_, net_path_):
 
         if dev_score > best_dev_score:
             torch.save(net.state_dict(), net_path_.replace('pretrained', 'baseline'))
-            best_dev_score = dev_score
+            best_dev_score = max(best_dev_score, dev_score)
 
     pdf_lab.close()
     pdf_unlab.close()
@@ -247,7 +249,7 @@ if __name__ == "__main__":
             saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
             train_baseline(net, saved_path)
     elif bool(args.baseline):
-        saved_path = 'best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
-        train_baseline(net, saved_path)
+        saved_path = 'results/baseline_scratch/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
+        train_baseline(net, saved_path, resume= False)
 
     # saved_path, pretrained_score = pre_train(0.1)
