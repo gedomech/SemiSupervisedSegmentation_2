@@ -7,6 +7,9 @@ from PIL import Image, ImageEnhance, ImageOps, ImageFilter
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+import warnings
+warnings.filterwarnings('ignore')
+
 num_class = 2
 spit_ratio = 0.9
 means = np.array([0.762824821091, 0.546326646928, 0.570878231817])
