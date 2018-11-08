@@ -6,6 +6,9 @@ from torch.utils.data import DataLoader
 from myutils.myLoss import JensenShannonDivergence
 
 import shutil
+import matplotlib.pyplot as plt
+from matplotlib.backends import backend_pdf
+import os, csv
 
 
 def colormap(n):
@@ -320,3 +323,75 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, 'best_model_'+filename)
+
+
+def plot_from_csvfile(csv_file:str, csv_file_baseline, delim=','):
+    id_exp = csv_file[:-4].split('_')[-1]
+    epoch, unlab, dev, lab, val = [], [], [], [], []
+    with open(csv_file, 'r') as csvfile:
+        data = csv.DictReader(csvfile, delimiter=delim)
+        for row in data:
+            epoch.append(int(row['epoch']))
+            unlab.append(float(row['unlab']))
+            dev.append(float(row['dev']))
+            lab.append(float(row['lab']))
+            val.append(float(row['val']))
+
+    id_exp_baseline = csv_file_baseline[:-4].split('_')[-1]
+    Epoch_baseline, unlab_baseline, dev_baseline, lab_baseline, val_baseline = [], [], [], [], []
+    with open(csv_file_baseline, 'r') as csv_file_baseline:
+        data = csv.DictReader(csv_file_baseline, delimiter=delim)
+        for row in data:
+            Epoch_baseline.append(int(row['epoch']))
+            unlab_baseline.append(float(row['unlab']))
+            dev_baseline.append(float(row['dev']))
+            lab_baseline.append(float(row['lab']))
+            val_baseline.append(float(row['val']))
+
+    f, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
+    ax1.plot(epoch, unlab, label='unlabaled')
+    ax1.plot(epoch, dev, label='development')
+    ax1.plot(epoch, lab, label='labeled')
+    ax1.plot(epoch, val, label='validation')
+    ax1.set_title('Pre-training_'+id_exp)
+    # ax1.set_title('Net Performance on different subsets')
+    ax2.plot(Epoch_baseline, unlab_baseline, label='unlabaled')
+    ax2.plot(Epoch_baseline, dev_baseline, label='development')
+    ax2.plot(Epoch_baseline, lab_baseline, label='labeled')
+    ax2.plot(Epoch_baseline, val_baseline, label='validation')
+    ax2.set_title('Semi-with pseudolabels   _'+id_exp_baseline)
+    plt.legend()
+    plt.show()
+
+    if id_exp == id_exp_baseline:
+        f.savefig('results_exp_for_{}_fraction.pdf'.format(id_exp), bbox_inches='tight')
+    else:
+        print('Warning: Files do not correspond to the same experiment!')
+
+
+def save_segm2pdf(net, data_loader, batch_size, device, pdf_file, epoch):
+    net.eval()
+    list_names = data_loader.dataset.imgs[:batch_size]
+
+    with torch.no_grad():
+        imgs, mask, _ = image_batch_generator(data_loader, device=device)
+        segms = pred2segmentation(net(imgs)).cpu().numpy()
+        gts = mask.squeeze(dim=1).cpu().numpy()
+
+        figs = plt.figure()
+        f, axarr = plt.subplots(4, 2)
+        for idx in range(len(list_names)):
+            img_name = list_names[idx].split('/')[-1].split('.')[0]
+            axarr[idx, 0].imshow(segms[idx], cmap='gray')
+            axarr[idx, 0].set_title(img_name+' Seg at epoch {}'.format(epoch), fontsize= 'x-small')
+            axarr[idx, 0].axis('off')
+            axarr[idx, 1].imshow(gts[idx], cmap='gray')
+            axarr[idx, 1].set_title(img_name+' GT at epoch {}'.format(epoch), fontsize= 'x-small')
+            axarr[idx, 1].axis('off')
+
+        pdf_file.savefig(f)
+
+    net.train()
+
+
+
