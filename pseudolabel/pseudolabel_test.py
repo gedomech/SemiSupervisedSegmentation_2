@@ -261,5 +261,5 @@ if __name__ == "__main__":
     # saved_path, pretrained_score = pre_train(0.1)
 
     p = 0.1
-    saved_path = 'best_model_' + 'enet_pretrained_%.1f.pth' % float(p)
+    saved_path = 'results/right_init/best_model_' + 'enet_pretrained_%.1f.pth' % float(p)
     train_baseline(p, net, saved_path, resume= True)
