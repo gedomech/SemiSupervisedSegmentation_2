@@ -165,7 +165,7 @@ def train_baseline(p, net_, net_path_, resume=False):
     labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
     print('the length of the labeled dataset is: %d' % labeled_len)
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5, last_epoch=1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
     scheduler.step()
     #  loading pre-trained models
     if resume and os.path.isfile(net_path_):
@@ -178,16 +178,22 @@ def train_baseline(p, net_, net_path_, resume=False):
         validation_score = checkpoint['validation_score']
         best_dev_score = checkpoint['best_dev_score']
         net_.load_state_dict(checkpoint['state_dict'])
-        scheduler.load_state_dict(checkpoint['scheduler'])
         optimizer.load_state_dict(checkpoint['optimizer'])
+
+        print("=> Initial_lr: {} and lr: {} from chaeckpoint%.3f".format(optimizer.param_groups[0]['initial_lr'],
+                                                                         optimizer.param_groups[0]['lr']))
+        optimizer.param_groups[0]['initial_lr'] = optimizer.param_groups[0]['lr']
+
+        scheduler.load_state_dict(checkpoint['scheduler'])
+
         labeled_data = checkpoint['labeled_dataloader']
-        print("=> {} checkpoint of arch '{}' at epoch {}: lab:%3f, unlab:%, dev:%3f,  val:%.3f".format(net_path_,
-                                                                                                       arch_name,
-                                                                                                       start_epoch,
-                                                                                                       labeled_score,
-                                                                                                       unlabeled_score,
-                                                                                                       best_dev_score,
-                                                                                                       validation_score))
+        print("=> {} checkpoint of arch '{}' at epoch {}: lab: {:.3f}, unlab: {:.3f}, dev: {:.3f},  val:{:.3f}".format(net_path_,
+                                                                                                                       arch_name,
+                                                                                                                       start_epoch,
+                                                                                                                       labeled_score,
+                                                                                                                       unlabeled_score,
+                                                                                                                       best_dev_score,
+                                                                                                                       validation_score))
     else:
         print("=> no checkpoint found at '{}'".format(net_path_))
 
