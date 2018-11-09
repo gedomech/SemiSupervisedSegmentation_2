@@ -2,7 +2,7 @@
 import os
 from multiprocessing import Pool
 # ps = [0.1, 0.2, 0.4, 0.6,0.8,1]
-ps = [0.5]
+ps = [0.1]
 class iterator_:
     def __init__(self,list) -> None:
         super().__init__()
