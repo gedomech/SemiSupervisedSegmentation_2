@@ -263,7 +263,7 @@ if __name__ == "__main__":
             train_baseline(net, saved_path)
     elif bool(args.baseline):
         saved_path = 'results/right_init/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
-        train_baseline(float(args.p), net, saved_path, resume= False)
+        train_baseline(float(args.p), net, saved_path, resume=True)
 
     # saved_path, pretrained_score = pre_train(0.1)
 
