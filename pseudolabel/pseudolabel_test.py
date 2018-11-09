@@ -166,6 +166,7 @@ def train_baseline(p, net_, net_path_, resume=False):
     print('the length of the labeled dataset is: %d' % labeled_len)
 
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5, last_epoch=1)
+    scheduler.step()
     #  loading pre-trained models
     if resume and os.path.isfile(net_path_):
         print("=> loading checkpoint '{}'".format(net_path_))
