@@ -165,7 +165,7 @@ def train_baseline(p, net_, net_path_, resume=False):
     labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
     print('the length of the labeled dataset is: %d' % labeled_len)
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5, last_epoch=1)
     #  loading pre-trained models
     if resume and os.path.isfile(net_path_):
         print("=> loading checkpoint '{}'".format(net_path_))
@@ -241,21 +241,25 @@ def train_baseline(p, net_, net_path_, resume=False):
 
 
 if __name__ == "__main__":
-    # Pre-training Stage
-    import argparse
-
-    parser = argparse.ArgumentParser(description='split the training data')
-    parser.add_argument('--p', default=0.8)
-    parser.add_argument('--pretrain', default=False)
-    parser.add_argument('--baseline', default=True)
-    args = parser.parse_args()
-    if bool(args.pretrain):
-        saved_path, pretrained_score = pre_train(args.p)
-        if bool(args.baseline):
-            saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
-            train_baseline(net, saved_path)
-    elif bool(args.baseline):
-        saved_path = 'results/baseline_scratch/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
-        train_baseline(net, saved_path, resume= False)
+    # # Pre-training Stage
+    # import argparse
+    #
+    # parser = argparse.ArgumentParser(description='split the training data')
+    # parser.add_argument('--p', default=0.8)
+    # parser.add_argument('--pretrain', default=False)
+    # parser.add_argument('--baseline', default=True)
+    # args = parser.parse_args()
+    # if bool(args.pretrain):
+    #     saved_path, pretrained_score = pre_train(args.p)
+    #     if bool(args.baseline):
+    #         saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
+    #         train_baseline(net, saved_path)
+    # elif bool(args.baseline):
+    #     saved_path = 'results/baseline_scratch/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
+    #     train_baseline(net, saved_path, resume= False)
 
     # saved_path, pretrained_score = pre_train(0.1)
+
+    p = 0.1
+    saved_path = 'best_model_' + 'enet_pretrained_%.1f.pth' % float(p)
+    train_baseline(p, net, saved_path, resume= True)
