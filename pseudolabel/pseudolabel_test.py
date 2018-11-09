@@ -69,8 +69,8 @@ dev_data = DataLoader(dev_data, **unlabeled_loader_params)
 val_data = DataLoader(val_data, **unlabeled_loader_params)
 map_location=lambda storage, loc: storage
 ## networks and optimisers
-# net = Enet(class_number)
-net = SegNet(class_number)
+net = Enet(class_number)
+# net = SegNet(class_number)
 net = net.to(device)
 
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
@@ -94,7 +94,7 @@ def pre_train(p):
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 150, 175], gamma=0.2)
 
     pdf_lab = backend_pdf.PdfPages('pretrain_segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('pretrain_segmentation_tracker_unlabele.pdf')
+    pdf_unlab = backend_pdf.PdfPages('pretrain_segmentation_tracker_unlabeled.pdf')
 
     for epoch in range(max_epoch_pre):
         scheduler.step()
@@ -196,8 +196,8 @@ def train_baseline(p, net_, net_path_, resume=False):
     net_.train()
     learning_rate_reset(optimizer, lr=1e-6)
 
-    pdf_lab = backend_pdf.PdfPages('results/baseline_scratch/baseline_segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('results/baseline_scratch/baseline_segmentation_tracker_unlabeled.pdf')
+    pdf_lab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_labeled.pdf')
+    pdf_unlab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_unlabeled.pdf')
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
