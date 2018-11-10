@@ -204,8 +204,8 @@ def train_baseline(p, net_, net_path_, resume=False):
     net_.train()
     # learning_rate_reset(optimizer, lr=1e-6)
 
-    pdf_lab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_unlabeled.pdf')
+    # pdf_lab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_labeled.pdf')
+    # pdf_unlab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_unlabeled.pdf')
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
@@ -234,9 +234,9 @@ def train_baseline(p, net_, net_path_, resume=False):
             total_loss[0].backward()
             optimizer.step()
 
-        if epoch % 10 == 0:
-            _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
-                 zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
+        # if epoch % 10 == 0:
+        #     _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
+        #          zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
 
         pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv'))
 
@@ -244,8 +244,8 @@ def train_baseline(p, net_, net_path_, resume=False):
             torch.save(net.state_dict(), net_path_.replace('pretrained', 'baseline'))
             best_dev_score = max(best_dev_score, dev_score)
 
-    pdf_lab.close()
-    pdf_unlab.close()
+    # pdf_lab.close()
+    # pdf_unlab.close()
 
 
 if __name__ == "__main__":
