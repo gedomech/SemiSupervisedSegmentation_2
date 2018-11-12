@@ -5,6 +5,9 @@ from torch.utils.data import DataLoader
 
 from myutils.myLoss import JensenShannonDivergence
 
+import warnings
+warnings.filterwarnings('ignore')
+
 import shutil
 import matplotlib.pyplot as plt
 from matplotlib.backends import backend_pdf
