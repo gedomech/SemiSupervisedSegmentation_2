@@ -322,7 +322,7 @@ def evaluate(net, dataloader, device):
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'best_model_'+filename)
+        shutil.copyfile(filename, filename.replace('enet_', 'best_model_'))
 
 
 def plot_from_csvfile(csv_file:str, csv_file_baseline, delim=','):
