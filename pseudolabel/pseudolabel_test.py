@@ -36,8 +36,8 @@ labeled_batch_size = 4
 unlabeled_batch_size = 4
 val_batch_size = 4
 
-max_epoch_pre = 200
-max_epoch_baseline = 200
+max_epoch_pre = 4
+max_epoch_baseline = 4
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
@@ -76,7 +76,7 @@ net = net.to(device)
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
 
 ## loss
-class_weigth = [1 , 1]
+class_weigth = [1, 1]
 class_weigth = torch.Tensor(class_weigth)
 criterion = CrossEntropyLoss2d(class_weigth).to(device)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
@@ -84,7 +84,7 @@ historical_track = []
 
 
 def pre_train(p):
-    net_save_path = 'enet_pretrained_%.1f.pth' % float(p)
+    net_save_path = 'results/class_weight_mod/enet_pretrained_%.1f.pth' % float(p)
 
     labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
     labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
@@ -93,8 +93,8 @@ def pre_train(p):
     best_dev_score = -1
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 150, 175], gamma=0.2)
 
-    pdf_lab = backend_pdf.PdfPages('pretrain_segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('pretrain_segmentation_tracker_unlabeled.pdf')
+    pdf_lab = backend_pdf.PdfPages('results/class_weight_mod/pretrain_segmentation_tracker_labeled.pdf')
+    pdf_unlab = backend_pdf.PdfPages('results/class_weight_mod/pretrain_segmentation_tracker_unlabeled.pdf')
 
     for epoch in range(max_epoch_pre):
         scheduler.step()
@@ -204,8 +204,8 @@ def train_baseline(p, net_, net_path_, resume=False):
     net_.train()
     # learning_rate_reset(optimizer, lr=1e-6)
 
-    # pdf_lab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_labeled.pdf')
-    # pdf_unlab = backend_pdf.PdfPages('results/right_init/baseline_segmentation_tracker_unlabeled.pdf')
+    pdf_lab = backend_pdf.PdfPages('results/class_weight_mod/baseline_segmentation_tracker_labeled.pdf')
+    pdf_unlab = backend_pdf.PdfPages('results/class_weight_mod/baseline_segmentation_tracker_unlabeled.pdf')
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
@@ -234,9 +234,9 @@ def train_baseline(p, net_, net_path_, resume=False):
             total_loss[0].backward()
             optimizer.step()
 
-        # if epoch % 10 == 0:
-        #     _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
-        #          zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
+        if epoch % 10 == 0:
+            _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
+                 zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
 
         pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv'))
 
@@ -244,8 +244,8 @@ def train_baseline(p, net_, net_path_, resume=False):
             torch.save(net.state_dict(), net_path_.replace('pretrained', 'baseline'))
             best_dev_score = max(best_dev_score, dev_score)
 
-    # pdf_lab.close()
-    # pdf_unlab.close()
+    pdf_lab.close()
+    pdf_unlab.close()
 
 
 if __name__ == "__main__":
@@ -263,7 +263,7 @@ if __name__ == "__main__":
             saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
             train_baseline(net, saved_path)
     elif bool(args.baseline):
-        saved_path = 'results/right_init/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
+        saved_path = 'results/class_weight_mod/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
         train_baseline(float(args.p), net, saved_path, resume=True)
 
     # saved_path, pretrained_score = pre_train(0.1)
