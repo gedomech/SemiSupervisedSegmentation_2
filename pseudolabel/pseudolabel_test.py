@@ -76,7 +76,7 @@ net = net.to(device)
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
 
 ## loss
-class_weigth = [1 * 0.1, 3.53]
+class_weigth = [1 , 1]
 class_weigth = torch.Tensor(class_weigth)
 criterion = CrossEntropyLoss2d(class_weigth).to(device)
 ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
