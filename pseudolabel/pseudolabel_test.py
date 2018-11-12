@@ -260,7 +260,7 @@ if __name__ == "__main__":
     if bool(args.pretrain):
         saved_path, pretrained_score = pre_train(args.p)
         if bool(args.baseline):
-            saved_path = 'best_model_'+saved_path  # path corresponding to the best model checkpoint
+            saved_path = saved_path.replace('enet_', 'best_model_')  # 'best_model_'+saved_path  # path corresponding to the best model checkpoint
             train_baseline(net, saved_path)
     elif bool(args.baseline):
         saved_path = 'results/class_weight_mod/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
