@@ -159,11 +159,11 @@ def train_baseline(p, net_, net_path_, resume=False):
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
-    global labeled_data
-    labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
-    labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
-    labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
-    print('the length of the labeled dataset is: %d' % labeled_len)
+    # global labeled_data
+    # labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
+    # labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
+    # labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
+    # print('the length of the labeled dataset is: %d' % labeled_len)
 
     print(net_path_)
 
@@ -261,7 +261,7 @@ if __name__ == "__main__":
         saved_path, pretrained_score = pre_train(args.p)
         if bool(args.baseline):
             saved_path = saved_path.replace('enet_', 'best_model_')  # 'best_model_'+saved_path  # path corresponding to the best model checkpoint
-            train_baseline(net, saved_path)
+            train_baseline(float(args.p), net, saved_path, resume=True)
     elif bool(args.baseline):
         saved_path = 'results/class_weight_mod/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
         train_baseline(float(args.p), net, saved_path, resume=True)
