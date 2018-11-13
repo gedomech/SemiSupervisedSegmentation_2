@@ -26,7 +26,7 @@ GPU = iterator_([0])
 
 cmds = []
 for p in ps:
-    cmds.append('OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES=%d python pseudolabel_test.py --p %.2f --pretrain True --baseline True '%(GPU(), p))
+    cmds.append('OMP_NUM_THREADS=4 CUDA_VISIBLE_DEVICES=%d python pseudolabel_test.py --p %.2f --pretrain False --baseline True '%(GPU(), p))
 print(cmds)
 
 P = Pool(1)
