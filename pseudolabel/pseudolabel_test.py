@@ -190,7 +190,7 @@ def train_baseline(p, net_, net_path_, resume=False):
         # scheduler.load_state_dict(checkpoint['scheduler'])
 
         labeled_data = checkpoint['labeled_dataloader']
-        print("=> {} checkpoint of arch '{}' at epoch {}: lab: {:.3f}, unlab: {:.3f}, dev: {:.3f},  val:{.3f}".format(net_path_,
+        print("=> {} checkpoint of arch '{}' at epoch {}: lab: {:.3f}, unlab: {:.3f}, dev: {:.3f},  val:{:.3f}".format(net_path_,
                                                                                                                        arch_name,
                                                                                                                        start_epoch,
                                                                                                                        labeled_score,
