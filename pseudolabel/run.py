@@ -7,7 +7,7 @@ warnings.filterwarnings('ignore')
 
 # ps = [0.1, 0.2, 0.4, 0.6,0.8,1]
 # ps = [0.1, 0.5, 1.0]
-ps = [0.1]
+ps = [0.5, 1.0]
 class iterator_:
     def __init__(self,list) -> None:
         super().__init__()
