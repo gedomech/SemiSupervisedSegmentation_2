@@ -61,7 +61,7 @@ def iou_loss(pred, target, n_class):
     return ious
 
 
-def image_batch_generator(dataset=None, device=torch.device):
+def image_batch_generator(dataset, device):
     """
     This function generates batches containing (images, masks, paths)
     :param dataset: torch.utils.data.Dataset object to be loaded
@@ -229,11 +229,11 @@ def test(nets_,  test_loader_,device, **kwargs):
 def get_mv_based_labels(imgs,nets):
     class_number =2
     prediction = []
-    distributions = torch.zeros([imgs.shape[0], class_number, imgs.shape[2], imgs.shape[3]]).to(imgs.dtype)
+    distributions = torch.zeros([imgs.shape[0], class_number, imgs.shape[2], imgs.shape[3]]).to(imgs.device)
     for idx, (net_i) in enumerate(nets):
         pred = F.softmax(net_i(imgs))
         prediction.append(pred)
-        distributions+=pred.cpu()
+        distributions+=pred
     distributions/=3
     return pred2segmentation(distributions), prediction
 

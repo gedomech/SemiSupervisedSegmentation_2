@@ -1,7 +1,7 @@
 # coding=utf-8
 import logging
 import os
-import sys
+import sys, json
 
 import pandas as pd
 from matplotlib.backends import backend_pdf
@@ -12,14 +12,13 @@ logger.setLevel(logging.INFO)
 sys.path.extend([os.path.dirname(os.getcwd())])
 from myutils.myDataLoader import ISICdata
 from myutils.myENet import Enet
-from myutils.myNetworks import SegNet
 from myutils.myLoss import CrossEntropyLoss2d
-import warnings
 from tqdm import tqdm
 from myutils.myUtils import *
+from tensorboardX import SummaryWriter
 
+writer = SummaryWriter()
 warnings.filterwarnings('ignore')
-# writer = SummaryWriter()
 
 # torch.set_num_threads(1)  # set by deafault to 1
 root = "../datasets/ISIC2018"
@@ -37,29 +36,28 @@ unlabeled_batch_size = 4
 val_batch_size = 4
 
 max_epoch_pre = 200
-max_epoch_baseline = 200
+max_epoch_baseline = 100
 max_epoch_ensemble = 100
 train_print_frequncy = 10
 val_print_frequncy = 10
 
-Equalize = False
 ## data for semi-supervised training
 labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
-                        dataAugment=False, equalize=Equalize)
+                        dataAugment=False, equalize=False)
 unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=True,
-                          dataAugment=False, equalize=Equalize)
+                          dataAugment=False, equalize=False)
 dev_data = ISICdata(root=root, model='dev', mode='semi', transform=True,
-                    dataAugment=False, equalize=Equalize)
+                    dataAugment=False, equalize=False)
 val_data = ISICdata(root=root, model='val', mode='semi', transform=True,
-                    dataAugment=False, equalize=Equalize)
+                    dataAugment=False, equalize=False)
 
 labeled_loader_params = {'batch_size': labeled_batch_size,
-                         'shuffle': False,  # True
+                         'shuffle': True,  # True
                          'num_workers': number_workers,
                          'pin_memory': True}
 
 unlabeled_loader_params = {'batch_size': unlabeled_batch_size,
-                           'shuffle': False,
+                           'shuffle': True,
                            'num_workers': number_workers,
                            'pin_memory': True}
 
@@ -67,15 +65,10 @@ labeled_data = DataLoader(labeled_data, **labeled_loader_params)
 unlabeled_data = DataLoader(unlabeled_data, **unlabeled_loader_params)
 dev_data = DataLoader(dev_data, **unlabeled_loader_params)
 val_data = DataLoader(val_data, **unlabeled_loader_params)
-map_location=lambda storage, loc: storage
+map_location = lambda storage, loc: storage
 ## networks and optimisers
 net = Enet(class_number)
-# net = SegNet(class_number)
 net = net.to(device)
-
-optimizer_pre = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
-optimizer_baseline = torch.optim.SGD(net.parameters(), lr=lr, weight_decay=weigth_decay)
-
 
 ## loss
 class_weigth = [1, 1]
@@ -85,21 +78,26 @@ ensemble_criterion = JensenShannonDivergence(reduce=True, size_average=False)
 historical_track = []
 
 
-def pre_train(p):
-    net_save_path = 'results/class_weight_mod/enet_pretrained_%.1f.pth' % float(p)
+def pre_train(p, lr):
+    optimizer_pre = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weigth_decay)
+    net_save_path = 'results/enet_pretrained_%.1f_lr_%.5f.pth' % (float(p), lr)
+    try:
+        os.mkdir('results')
+    except Exception as e:
+        print(e)
 
     labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
     labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
     labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
     print('the length of the labeled dataset is: %d' % labeled_len)
     best_dev_score = -1
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer_pre, milestones=[50, 100, 150, 175], gamma=0.2)
-
-    pdf_lab = backend_pdf.PdfPages('results/class_weight_mod/pretrain_segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('results/class_weight_mod/pretrain_segmentation_tracker_unlabeled.pdf')
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer_pre, milestones=[50, 100, 150, 175], gamma=0.5)
 
     for epoch in range(max_epoch_pre):
         scheduler.step()
+        [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
+                                                                         (labeled_data, unlabeled_data, dev_data,
+                                                                          val_data)]
         for i, (img, mask, _) in tqdm(enumerate(labeled_data)):
             img, mask = img.to(device), mask.to(device)
             optimizer_pre.zero_grad()
@@ -108,25 +106,14 @@ def pre_train(p):
             loss.backward()
             optimizer_pre.step()
 
-        if epoch % 10 == 0:
-            _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
-                 zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
-            #
-            # if epoch == 1:
-
-            # save_segm2pdf(pred, mask, labeled_data.dataset.imgs[:labeled_batch_size], device pdf, epoch)
-
-                # pdf_lab.close()
-                # pdf_unlab.close()
-
-        [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
-                                                                         (labeled_data, unlabeled_data, dev_data,
-                                                                          val_data)]
-
         logging.info('pretrained stage: lab:%3f  unlab:%3f  dev:%3f   val:%.3f' % (
             labeled_score, unlabeled_score, dev_score, validation_score))
-        historical_track.append(
-            {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
+
+        score_Dict = {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score,
+                      'epoch': epoch}
+        historical_track.append(score_Dict)
+        score_Dict.pop('epoch')
+        writer.add_scalars('pretrain', score_Dict, epoch)
         pd.DataFrame(historical_track).to_csv(net_save_path.replace('pth', 'csv'))
 
         # remember best acc@1 and save checkpoint
@@ -145,35 +132,35 @@ def pre_train(p):
             'labeled_dataloader': labeled_data,
         }, is_best, filename=net_save_path)
 
-        # if dev_score > best_dev_score:
-        #     dict_to_save = {'labeled_dataloader': labeled_data,
-        #                     'state_dict': net.state_dict()}
-        #     torch.save(dict_to_save, net_save_path)
-        #     best_dev_score = dev_score
-    pdf_lab.close()
-    pdf_unlab.close()
-
     return net_save_path, best_dev_score
 
 
-def train_baseline(p, net_, net_path_, resume=False):
+def train_baseline(p, net_, net_path_, resume=False, args=None):
+    lr = args.baseline_lr
+    optim_type = args.optim_type
+    config = json.dumps(vars(args))
+    saved_path = net_path_.split('/')[0] + '/' + config + '.pth'
+    assert optim_type in ('sgd', 'adam')
+    if optim_type == 'sgd':
+        optimizer_baseline = torch.optim.SGD(net.parameters(), lr=lr, weight_decay=weigth_decay)
+    else:
+        optimizer_baseline = torch.optim.Adam(net.parameters(), lr=lr)
+
     semi_historical_track = []
     """
     This function performs the training of the pre-trained models with the labeled and unlabeled data.
     """
-    # global labeled_data
-    # labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
-    # labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
-    # labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
-    # print('the length of the labeled dataset is: %d' % labeled_len)
+    global labeled_data
+    labeled_len = int(labeled_data.dataset.imgs.__len__() * float(p))
+    labeled_data.dataset.imgs = labeled_data.dataset.imgs[:labeled_len]
+    labeled_data.dataset.gts = labeled_data.dataset.gts[:labeled_len]
+    print('the length of the labeled dataset is: %d' % labeled_len)
 
-    print(net_path_)
-
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer_baseline, milestones=[50, 100, 130, 160, 180], gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer_baseline, milestones=[50, 75], gamma=0.5)
     #  loading pre-trained models
     if resume and os.path.isfile(net_path_):
         print("=> loading checkpoint '{}'".format(net_path_))
-        checkpoint = torch.load(net_path_)
+        checkpoint = torch.load(net_path_, map_location=lambda storage, loc: storage)
         start_epoch = checkpoint['epoch']
         arch_name = checkpoint['arch']
         labeled_score = checkpoint['labeled_score']
@@ -181,49 +168,37 @@ def train_baseline(p, net_, net_path_, resume=False):
         validation_score = checkpoint['validation_score']
         best_dev_score = checkpoint['best_dev_score']
         net_.load_state_dict(checkpoint['state_dict'])
-        # optimizer.load_state_dict(checkpoint['optimizer'])
-
-        # print("=> Initial_lr: {.3f} and lr: {.3f} from checkpoint".format(optimizer.param_groups[0]['initial_lr'],
-        #                                                                  optimizer.param_groups[0]['lr']))
-        # optimizer.param_groups[0]['initial_lr'] = optimizer.param_groups[0]['lr']
-
-        # scheduler.load_state_dict(checkpoint['scheduler'])
 
         labeled_data = checkpoint['labeled_dataloader']
-        print("=> {} checkpoint of arch '{}' at epoch {}: lab: {:.3f}, unlab: {:.3f}, dev: {:.3f},  val:{:.3f}".format(net_path_,
-                                                                                                                       arch_name,
-                                                                                                                       start_epoch,
-                                                                                                                       labeled_score,
-                                                                                                                       unlabeled_score,
-                                                                                                                       best_dev_score,
-                                                                                                                       validation_score))
+        print("=> {} checkpoint of arch '{}' at epoch {}: lab: {:.3f}, unlab: {:.3f}, dev: {:.3f},  val:{:.3f}".format(
+            net_path_,
+            arch_name,
+            start_epoch,
+            labeled_score,
+            unlabeled_score,
+            best_dev_score,
+            validation_score))
     else:
         print("=> no checkpoint found at '{}'".format(net_path_))
-
+        raise ValueError
     # net_.load_state_dict(torch.load(net_path_, map_location= map_location)['state_dict'])
     # labeled_data = torch.load(net_path_,map_location=map_location )['labeled_dataloader']
     print('the length of the labeled dataset is: %d' % labeled_data.dataset.imgs.__len__())
     net_.train()
-    # learning_rate_reset(optimizer, lr=1e-6)
-
-    pdf_lab = backend_pdf.PdfPages('results/class_weight_mod/baseline_segmentation_tracker_labeled.pdf')
-    pdf_unlab = backend_pdf.PdfPages('results/class_weight_mod/baseline_segmentation_tracker_unlabeled.pdf')
 
     best_dev_score = -1
     print("STARTING THE BASELINE TRAINING!!!!")
     # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[50, 100, 130, 160, 180], gamma=0.5)
     for epoch in range(max_epoch_baseline):
-        print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
         scheduler.step()
+        print('epoch = {0:4d}/{1:4d} training baseline'.format(epoch, max_epoch_baseline))
 
         [labeled_score, unlabeled_score, dev_score, validation_score] = [evaluate(net, x, device) for x in
                                                                          (labeled_data, unlabeled_data, dev_data,
                                                                           val_data)]
-        semi_historical_track.append(
-            {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score, 'epoch': epoch})
-        # train with labeled data
-        for _ in tqdm(range(len(labeled_data))):  #
 
+        for _ in tqdm(range(int((len(labeled_data) + len(unlabeled_data)) / 2))):  #
+            # train with labeled data
             imgs, masks, _ = image_batch_generator(labeled_data, device=device)
             _, llost_list, _ = batch_labeled_loss_(imgs, masks, [net_], criterion)
 
@@ -236,18 +211,16 @@ def train_baseline(p, net_, net_path_, resume=False):
             total_loss[0].backward()
             optimizer_baseline.step()
 
-        if epoch % 10 == 0:
-            _ = [save_segm2pdf(net, x, labeled_batch_size, device, y, epoch+1) for x, y in
-                 zip([labeled_data, unlabeled_data], [pdf_lab, pdf_unlab])]
-
-        pd.DataFrame(semi_historical_track).to_csv(net_path_.replace('pretrained', 'baseline').replace('pth', 'csv'))
+        score_Dict = {'lab': labeled_score, 'unlab': unlabeled_score, 'val': validation_score, 'dev': dev_score,
+                      'epoch': epoch}
+        semi_historical_track.append(score_Dict)
+        score_Dict.pop('epoch')
+        writer.add_scalars('baseline', score_Dict, epoch)
+        pd.DataFrame(semi_historical_track).to_csv(saved_path.replace('pth', 'csv'))
 
         if dev_score > best_dev_score:
-            torch.save(net.state_dict(), net_path_.replace('pretrained', 'baseline'))
+            torch.save(net.state_dict(), saved_path)
             best_dev_score = max(best_dev_score, dev_score)
-
-    pdf_lab.close()
-    pdf_unlab.close()
 
 
 if __name__ == "__main__":
@@ -255,21 +228,20 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='split the training data')
-    parser.add_argument('--p', default=0.8)
-    parser.add_argument('--pretrain', default=False)
-    parser.add_argument('--baseline', default=True)
+    parser.add_argument('--p', default=0.5, type=float)
+    parser.add_argument('--pretrain', action='store_true')
+    parser.add_argument('--pre_lr', default=0.001, type=float)
+    parser.add_argument('--baseline', action='store_true')
+    parser.add_argument('--baseline_lr', default=0.001, type=float)
+    parser.add_argument('--optim_type', default='sgd', choices=('sgd', 'adam'), type=str)
     args = parser.parse_args()
-    if bool(args.pretrain):
-        saved_path, pretrained_score = pre_train(args.p)
-        if bool(args.baseline):
-            saved_path = saved_path.replace('enet_', 'best_model_')  # 'best_model_'+saved_path  # path corresponding to the best model checkpoint
-            train_baseline(float(args.p), net, saved_path, resume=True)
+    if args.pretrain:
+
+        saved_path, pretrained_score = pre_train(args.p, lr=args.pre_lr)
+        if args.baseline:
+            saved_path = saved_path.replace('enet_',
+                                            'best_model_')  # 'best_model_'+saved_path  # path corresponding to the best model checkpoint
+            train_baseline(args.p, net, saved_path, resume=True, args=args)
     elif bool(args.baseline):
-        saved_path = 'results/class_weight_mod/best_model_'+'enet_pretrained_%.1f.pth' % float(args.p)
-        train_baseline(float(args.p), net, saved_path, resume=True)
-
-    # saved_path, pretrained_score = pre_train(0.1)
-
-    # p = 0.1
-    # saved_path = 'results/right_init/best_model_' + 'enet_pretrained_%.1f.pth' % float(p)
-    # train_baseline(p, net, saved_path, resume= True)
+        saved_path = 'results/best_model_' + 'pretrained_%.1f_lr_%.5f.pth' % (args.p, args.pre_lr)
+        train_baseline(float(args.p), net, saved_path, resume=True, args=args)

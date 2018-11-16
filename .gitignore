@@ -15,3 +15,5 @@ runs/
 .pytest_cache/
 myutils/.pytest_cache/
 myutils/__pycache__/
+.DS_Store
+pseudolabel/.DS_Store
