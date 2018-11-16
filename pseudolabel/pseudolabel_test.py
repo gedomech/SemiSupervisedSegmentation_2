@@ -4,7 +4,6 @@ import os
 import sys, json
 
 import pandas as pd
-from matplotlib.backends import backend_pdf
 
 logging.basicConfig(format='%(levelname)s - %(module)s - %(message)s')
 logger = logging.getLogger('spam_application')
