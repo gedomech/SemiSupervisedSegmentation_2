@@ -146,7 +146,7 @@ class ISICdata(Dataset):
         return img, mask
 
     def __len__(self):
-        return int(len(self.imgs)/1)
+        return int(len(self.imgs))
 
 
 

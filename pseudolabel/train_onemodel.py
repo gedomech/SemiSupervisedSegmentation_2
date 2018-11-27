@@ -1,8 +1,8 @@
 # coding=utf-8
 import logging
-import sys
+import sys,os
 from abc import ABC, abstractmethod
-
+sys.path.extend([os.path.dirname(os.getcwd())])
 from absl import flags, app
 from tensorboardX import SummaryWriter
 
@@ -12,15 +12,29 @@ from myutils.myENet import Enet
 from myutils.myLoss import CrossEntropyLoss2d
 from myutils.myUtils import *
 
-logging.basicConfig(format='%(levelname)s - %(module)s - %(message)s')
-logger = logging.getLogger(__file__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+logger.parent = None
+
 sys.path.extend([os.path.dirname(os.getcwd())])
 import copy
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 warnings.filterwarnings('ignore')
+
+
+def config_logger(log_dir):
+    """ Get console handler """
+    log_format = logging.Formatter("[%(module)s - %(asctime)s - %(levelname)s] %(message)s")
+    logger.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler(stream=sys.stdout)
+    console_handler.setFormatter(log_format)
+
+    fh = logging.FileHandler(os.path.join(log_dir, 'log.log'))
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(log_format)
+
+    logger.handlers = [console_handler, fh]
 
 
 def get_dataloader(hparam):
@@ -58,13 +72,25 @@ class Trainer(ABC):
     def __init__(self, torchnet) -> None:
         super().__init__()
         self.torchnet = torchnet
+        self.name = 'base'
+        self.hparam = None
+        self.lrscheduler = None
+        self.dataloader = None
+        self.criterion = None
+        self.dataloader = None
 
-    @abstractmethod
     def _train(self, **kwargs):
         pass
 
     def set_writer(self, writer):
         self.writer = writer
+
+    def start_training(self, savedir):
+        logger.info(self.name + '  Training starts:')
+        for epoch in range(self.hparam['max_epoch']):
+            self.lrscheduler.step()
+            self._train(self.dataloader)
+            self.evaluate(epoch, savedir)
 
     def _evaluate(self, dataloader):
         dice_meter = AverageValueMeter()
@@ -77,6 +103,25 @@ class Trainer(ABC):
                 dice_meter.add(dice_loss(pred_mask, gt))
         self.torchnet.train()
         return dice_meter.value()[0]
+
+    def evaluate(self, epoch, savedir=None):
+
+        with torch.no_grad():
+            metrics = {}
+            dice = self._evaluate(self.dataloader['labeled'])
+            logger.info('at epoch: {:3d}, labeled_data dice: {:.3f} '.format(epoch, dice))
+            # self.writer.add_scalar('%s/labeled' % self.name, dice, epoch)
+            metrics['%s/labeled' % self.name] = dice
+            dice = self._evaluate(self.dataloader['unlabeled'])
+            logger.info('at epoch: {:3d}, unlabeled_data dice: {:.3f} '.format(epoch, dice))
+            # self.writer.add_scalar('%s/unlabeled' % self.name, dice, epoch)
+            metrics['%s/unlabeled' % self.name] = dice
+            dice = self._evaluate(self.dataloader['val'])
+            logger.info('at epoch: {:3d}, val_data dice: {:.3f} '.format(epoch, dice))
+            # self.writer.add_scalar('%s/val' % self.name, dice, epoch)
+            metrics['%s/val' % self.name] = dice
+            self.writer.add_scalars(self.name, metrics, epoch)
+        self.checkpoint(dice, epoch, savedir)
 
     @property
     def save_dict(self):
@@ -96,6 +141,16 @@ class Trainer(ABC):
         except:
             self.best_dice = -1
 
+        ## save this checkpoint as last.pth
+        dict2save = {}
+        dict2save['epoch'] = epoch
+        dict2save['dice'] = dice
+        dict2save['model'] = self.save_dict
+        if name is None:
+            torch.save(dict2save, 'last.pth')
+        else:
+            torch.save(dict2save, name + '/last.pth')
+
         if dice > self.best_dice:
             self.best_dice = dice
             dict2save = dict()
@@ -105,9 +160,14 @@ class Trainer(ABC):
             if name is None:
                 torch.save(dict2save, 'best.pth')
             else:
-                torch.save(dict2save, name)
+                torch.save(dict2save, name + '/best.pth')
         else:
             return
+
+    def load_checkpoint(self, path):
+        model = torch.load(path, map_location=lambda storage, loc: storage)
+        logger.info('Saved_epoch: {}, Dice: {:3f}'.format(model['epoch'], model['dice']))
+        self.torchnet.load_state_dict(model['model'])
 
 
 class FullysupervisedTrainer(Trainer):
@@ -131,7 +191,7 @@ class FullysupervisedTrainer(Trainer):
 
     def __init__(self, torchnet, dataloader, hparam) -> None:
         super().__init__(torchnet)
-        self.name = 'Fully_Supervised Training'
+        self.name = 'Fully_Supervised_Training'
         self.dataloader = dataloader
         self.hparam = copy.deepcopy(self._rm_alias(hparam))
         optim_hparam = self._rm_alias(extract_from_big_dict(self.hparam, FullysupervisedTrainer.optim_keys))
@@ -142,29 +202,13 @@ class FullysupervisedTrainer(Trainer):
         self.criterion = get_citerion(self.hparam['loss_name'], **criterion_hparam)
         self.criterion.to(device)
 
-    def start_training(self):
-        logger.info(self.name + '  Training starts:')
-        for epoch in range(self.hparam['max_epoch']):
-            self.lrscheduler.step()
-            self._train(self.dataloader['labeled'], self.criterion)
-            with torch.no_grad():
-                dice = self._evaluate(self.dataloader['labeled'])
-                logger.info('labeled_data dice: {.3f} at epoch: {}'.format(dice, epoch))
-                self.writer.add_scalar('%s/labeled' % self.name, dice, epoch)
-                dice = self._evaluate(self.dataloader['unlabeled'])
-                logger.info('unlabeled_data dice: {.3f} at epoch: {}'.format(dice, epoch))
-                self.writer.add_scalar('%s/unlabeled' % self.name, dice, epoch)
-                dice = self._evaluate(self.dataloader['val'])
-                logger.info('val_data dice: {.3f} at epoch: {}'.format(dice, epoch))
-                self.writer.add_scalar('%s/val' % self.name, dice, epoch)
-
-    def _train(self, dataloader, criterion):
-        for i, (img, gt, _) in enumerate(dataloader):
+    def _train(self, dataloader):
+        for i, (img, gt, _) in enumerate(dataloader['labeled']):
             self.optim.zero_grad()
             self.torchnet.eval()
             img, gt = img.to(device), gt.to(device)
             pred_logit = self.torchnet(img)
-            loss = criterion(pred_logit, gt.squeeze(1))
+            loss = self.criterion(pred_logit, gt.squeeze(1))
             loss.backward()
             self.optim.step()
 
@@ -191,7 +235,7 @@ class SemisupervisedTrainer(Trainer):
 
     def __init__(self, torchnet, dataloader, hparam) -> None:
         super().__init__(torchnet)
-        self.name = 'Semi_Supervised Training'
+        self.name = 'Semi_Supervised_Training'
         self.dataloader = dataloader
         self.hparam = copy.deepcopy(self._rm_alias(hparam))
         optim_hparam = extract_from_big_dict(self.hparam, SemisupervisedTrainer.optim_keys)
@@ -204,28 +248,13 @@ class SemisupervisedTrainer(Trainer):
         self.criterion = get_citerion(self.hparam['loss_name'], **criterion_hparam)
         self.criterion.to(device)
 
-    def start_training(self):
-        for epoch in range(self.hparam['max_epoch']):
-            self.lrscheduler.step()
-            self._train(self.dataloader['labeled'], self.dataloader['unlabeled'], self.criterion)
-            with torch.no_grad():
-                dice = self._evaluate(self.dataloader['labeled'])
-                logger.info('labeled_data dice: {.3f} at epoch: {}'.format(dice, epoch))
-                self.writer.add_scalar('%s/labeled' % self.name, dice, epoch)
-                dice = self._evaluate(self.dataloader['unlabeled'])
-                logger.info('unlabeled_data dice: {.3f} at epoch: {}'.format(dice, epoch))
-                self.writer.add_scalar('%s/unlabeled' % self.name, dice, epoch)
-                dice = self._evaluate(self.dataloader['val'])
-                logger.info('val_data dice: {.3f} at epoch: {}'.format(dice, epoch))
-                self.writer.add_scalar('%s/val' % self.name, dice, epoch)
-
-    def _train(self, l_dataloader, u_dataloader, criterion):
-        for i, ((limg, lgt, _), (uimg, ugt, _)) in enumerate(zip(l_dataloader, u_dataloader)):
+    def _train(self, dataloaders):
+        for i, ((limg, lgt, _), (uimg, ugt, _)) in enumerate(zip(dataloaders['labeled'], dataloaders['unlabeled'])):
             if self.hparam['update_labeled']:
                 self.optim.zero_grad()
                 limg, lgt = limg.to(device), lgt.to(device)
                 pred_logit = self.torchnet(limg)
-                loss = criterion(pred_logit, lgt.squeeze(1))
+                loss = self.criterion(pred_logit, lgt.squeeze(1))
                 loss.backward()
                 self.optim.step()
             if self.hparam['update_unlabeled']:
@@ -233,7 +262,7 @@ class SemisupervisedTrainer(Trainer):
                 uimg, ugt = uimg.to(device), ugt.to(device)
                 pred_logit = self.torchnet(uimg)
                 mask = self.mask_generation(pred_logit)
-                loss = criterion(pred_logit, mask)
+                loss = self.criterion(pred_logit, mask)
                 loss.backward()
                 self.optim.step()
 
@@ -245,10 +274,14 @@ def get_default_parameter():
                          help='update the labeled image while self training')
     flags.DEFINE_boolean('semi_train__update_unlabeled', default=True,
                          help='update the unlabeled image while self training')
-    flags.DEFINE_boolean('run_pretrain', default=True,
+    flags.DEFINE_boolean('run_pretrain', default=False,
                          help='run_pretrain')
-    flags.DEFINE_boolean('run_semi', default=True,
+    flags.DEFINE_boolean('run_semi', default=False,
                          help='run_self_training')
+    flags.DEFINE_boolean('load_pretrain', default=True,
+                         help='load_pretrain for self training')
+    flags.DEFINE_string('model_path', default='', help='path to the pretrained model')
+    flags.DEFINE_string('save_dir', default=None, help='path to save')
 
 
 def get_citerion(lossname, **kwargs):
@@ -261,23 +294,38 @@ def get_citerion(lossname, **kwargs):
 
 class TrainWrapper(ABC):
 
-    def __init__(self, fullTrainer: FullysupervisedTrainer, semiTrainer: SemisupervisedTrainer) -> None:
+    def __init__(self, fullTrainer: FullysupervisedTrainer, semiTrainer: SemisupervisedTrainer, hparams) -> None:
         super().__init__()
         self.fulltrainer = fullTrainer
         self.semitrainer = semiTrainer
-        self.writer = SummaryWriter('runs/' + self.writer_name)
+        if hparams['save_dir'] is not None:
+            self.writername = 'runs/' + hparams['save_dir']
+        else:
+            self.writername = 'runs/' + self.writer_name
+        self.writer = SummaryWriter(self.writername)
         self.fulltrainer.set_writer(self.writer)
         self.semitrainer.set_writer(self.writer)
+        self.save_hparams(hparams, self.writername)
+        config_logger(self.writername)
 
     def run_fully_training(self):
-        self.fulltrainer.start_training()
+        self.fulltrainer.start_training(self.writername)
 
-    def run_semi_training(self):
-        self.semitrainer.start_training()
+    def run_semi_training(self, hparam):
+        if hparam['load_pretrain'] == True:
+            try:
+                logger.info('load checkpoint....')
+                self.semitrainer.load_checkpoint(hparam['model_path'])
+            except Exception as e:
+                logger.error(e)
+                print('recheck your --model_path')
+                exit(1)
+
+        self.semitrainer.start_training(self.writername)
 
     @property
     def writer_name(self):
-        return self.generate_random_str() + '_' + self.generate_current_time()
+        return self.generate_current_time() + '_' + self.generate_random_str()
 
     @staticmethod
     def generate_random_str(randomlength=16):
@@ -299,7 +347,8 @@ class TrainWrapper(ABC):
         return ctime
 
     @classmethod
-    def save_hparams(hparams, writer_name):
+    def save_hparams(cls, hparams, writername):
+        hparams = copy.deepcopy(hparams)
         import pandas as pd
         message = ''
         message += '----------------- Options ---------------\n'
@@ -308,11 +357,15 @@ class TrainWrapper(ABC):
             message += '{:>25}: {:<30}{}\n'.format(str(k), str(v), comment)
         message += '----------------- End -------------------'
         print(message)
-        file_name = os.path.join(writer_name, 'opt.txt')
+        file_name = os.path.join(writername, 'opt.txt')
         with open(file_name, 'wt') as opt_file:
             opt_file.write(message)
             opt_file.write('\n')
-        pd.Series(hparams).to_csv(os.path.join(writer_name, 'opt.csv'))
+        pd.Series(hparams).to_csv(os.path.join(writername, 'opt.csv'))
+
+    def cleanup(self):
+        self.writer.export_scalars_to_json(self.writername + '/json.json')
+        self.writer.close()
 
 
 def run(argv):
@@ -328,11 +381,13 @@ def run(argv):
 
     fullytrainer = FullysupervisedTrainer(net, dataloaders, hparam)
     semitrainer = SemisupervisedTrainer(net, dataloaders, hparam)
-    trainWrapper = TrainWrapper(fullytrainer, semitrainer)
+    trainWrapper = TrainWrapper(fullytrainer, semitrainer, hparam)
     if hparam['run_pretrain']:
         trainWrapper.run_fully_training()
+
     if hparam['run_semi']:
-        trainWrapper.run_semi_training()
+        trainWrapper.run_semi_training(hparam)
+    trainWrapper.cleanup()
 
 
 if __name__ == '__main__':
