@@ -1,7 +1,8 @@
 # coding=utf-8
 import logging
-import sys,os
+import sys, os
 from abc import ABC, abstractmethod
+
 sys.path.extend([os.path.dirname(os.getcwd())])
 from absl import flags, app
 from tensorboardX import SummaryWriter
@@ -88,9 +89,9 @@ class Trainer(ABC):
     def start_training(self, savedir):
         logger.info(self.name + '  Training starts:')
         for epoch in range(self.hparam['max_epoch']):
-            self.lrscheduler.step()
-            self._train(self.dataloader)
             self.evaluate(epoch, savedir)
+            self._train(self.dataloader)
+            self.lrscheduler.step()
 
     def _evaluate(self, dataloader):
         dice_meter = AverageValueMeter()
@@ -173,7 +174,7 @@ class Trainer(ABC):
 class FullysupervisedTrainer(Trainer):
     alias = 'full_train__'
     lrscheduler_keys = ['milestones', 'gamma']
-    optim_keys = ['lr', 'weight_decay', 'amsgrad']
+    optim_keys = ['lr', 'weight_decay']
     criterion_keys = ['weight']
 
     @classmethod
@@ -186,7 +187,8 @@ class FullysupervisedTrainer(Trainer):
         flags.DEFINE_float(cls.alias + 'weight_decay', default=0, help='weight_decay for full training')
         flags.DEFINE_multi_float(cls.alias + 'weight', default=[1, 1], help='weight balance for CE for full training')
         flags.DEFINE_string(cls.alias + 'loss_name', default='crossentropy', help='criterion used in the full training')
-        flags.DEFINE_string(cls.alias + 'optim', default='Adam', help='optimzer used in the full training')
+        flags.DEFINE_string(cls.alias + 'optim_name', default='SGD', help='optimzer used in the full training')
+        flags.DEFINE_string(cls.alias + 'optim_option', default='{}', help='optimzer used in the full training')
         flags.DEFINE_string(cls.alias + 'scheduler', default='MultiStepLR', help='scheduler used in the full training')
 
     def __init__(self, torchnet, dataloader, hparam) -> None:
@@ -194,8 +196,9 @@ class FullysupervisedTrainer(Trainer):
         self.name = 'Fully_Supervised_Training'
         self.dataloader = dataloader
         self.hparam = copy.deepcopy(self._rm_alias(hparam))
-        optim_hparam = self._rm_alias(extract_from_big_dict(self.hparam, FullysupervisedTrainer.optim_keys))
-        self.optim = getattr(torch.optim, self.hparam['optim'])(self.torchnet.parameters(), **optim_hparam)
+        optim_hparam = extract_from_big_dict(self.hparam, FullysupervisedTrainer.optim_keys)
+        optim_hparam.update(**eval(self.hparam['optim_option']))
+        self.optim = getattr(torch.optim, self.hparam['optim_name'])(self.torchnet.parameters(), **optim_hparam)
         lrschduler_hparam = extract_from_big_dict(self.hparam, FullysupervisedTrainer.lrscheduler_keys)
         self.lrscheduler = getattr(torch.optim.lr_scheduler, self.hparam['scheduler'])(self.optim, **lrschduler_hparam)
         criterion_hparam = extract_from_big_dict(self.hparam, FullysupervisedTrainer.criterion_keys)
@@ -230,8 +233,9 @@ class SemisupervisedTrainer(Trainer):
         flags.DEFINE_float(cls.alias + 'weight_decay', default=0, help='weight_decay for semi training')
         flags.DEFINE_multi_float(cls.alias + 'weight', default=[1, 1], help='weight balance for CE for semi training')
         flags.DEFINE_string(cls.alias + 'loss_name', default='crossentropy', help='criterion used in the semi training')
-        flags.DEFINE_string(cls.alias + 'optim', default='Adam', help='optimzer used in the semi training')
-        flags.DEFINE_string(cls.alias + 'scheduler', default='MultiStepLR', help='scheduler used in the full training')
+        flags.DEFINE_string(cls.alias + 'optim_name', default='Adam', help='optimzer used in the semi training')
+        flags.DEFINE_string(cls.alias + 'optim_option', default='{}', help='optimzer used in the semi training')
+        flags.DEFINE_string(cls.alias + 'scheduler', default='MultiStepLR', help='scheduler used in the semi training')
 
     def __init__(self, torchnet, dataloader, hparam) -> None:
         super().__init__(torchnet)
@@ -239,7 +243,8 @@ class SemisupervisedTrainer(Trainer):
         self.dataloader = dataloader
         self.hparam = copy.deepcopy(self._rm_alias(hparam))
         optim_hparam = extract_from_big_dict(self.hparam, SemisupervisedTrainer.optim_keys)
-        self.optim = getattr(torch.optim, self.hparam['optim'])(self.torchnet.parameters(), **optim_hparam)
+        optim_hparam.update(**eval(self.hparam['optim_option']))
+        self.optim = getattr(torch.optim, self.hparam['optim_name'])(self.torchnet.parameters(), **optim_hparam)
         lrschduler_hparam = extract_from_big_dict(self.hparam, SemisupervisedTrainer.lrscheduler_keys)
         self.lrscheduler = getattr(torch.optim.lr_scheduler, self.hparam['scheduler'])(self.optim,
                                                                                        **lrschduler_hparam)
