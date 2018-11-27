@@ -2,25 +2,51 @@
 import logging
 import os
 import sys, json
-
+from abc import ABC,abstractmethod,abstractclassmethod
 import pandas as pd
-
-logging.basicConfig(format='%(levelname)s - %(module)s - %(message)s')
-logger = logging.getLogger('spam_application')
-logger.setLevel(logging.INFO)
-sys.path.extend([os.path.dirname(os.getcwd())])
 from myutils.myDataLoader import ISICdata
 from myutils.myENet import Enet
 from myutils.myLoss import CrossEntropyLoss2d
 from tqdm import tqdm
 from myutils.myUtils import *
 from tensorboardX import SummaryWriter
+import torch
+logging.basicConfig(format='%(levelname)s - %(module)s - %(message)s')
+logger = logging.getLogger('spam_application')
+logger.setLevel(logging.INFO)
+sys.path.extend([os.path.dirname(os.getcwd())])
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 writer = SummaryWriter()
 warnings.filterwarnings('ignore')
 
 # torch.set_num_threads(1)  # set by deafault to 1
 root = "../datasets/ISIC2018"
+
+
+class trainer(ABC):
+    def __init__(self) -> None:
+        super().__init__()
+        self.torchnet = None
+
+    @abstractmethod
+    def train(self, **kwargs):
+        pass
+
+    @abstractmethod
+    def evaluate(self,**kwargs):
+        pass
+
+    def _evaluate(self,dataloader):
+        for i, (img,gt,_) in enumerate(dataloader,criterion):
+            img, gt = img.to(device), gt.to(device)
+            pred_logit = self.torchnet(img)
+
+
+
+
+
+
 
 class_number = 2
 lr = 1e-3

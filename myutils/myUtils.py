@@ -398,3 +398,11 @@ def save_segm2pdf(net, data_loader, batch_size, device, pdf_file, epoch):
 
 
 
+def extract_from_big_dict(big_dict, keys):
+    """ Get a small dictionary with key in `keys` and value
+        in big dict. If the key doesn't exist, give None.
+        :param big_dict: A dict
+        :param keys: A list of keys
+    """
+    #   TODO a bug has been found
+    return {key: big_dict.get(key) for key in keys if big_dict.get(key,'not_found')!='not_found' }
