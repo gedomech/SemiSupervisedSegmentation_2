@@ -81,6 +81,7 @@ class Trainer(ABC):
         self.dataloader = None
 
     def _train(self, **kwargs):
+
         pass
 
     def set_writer(self, writer):
@@ -89,40 +90,49 @@ class Trainer(ABC):
     def start_training(self, savedir):
         logger.info(self.name + '  Training starts:')
         for epoch in range(self.hparam['max_epoch']):
-            self.evaluate(epoch, savedir)
+            self.evaluate(epoch, mode='train', savedir=savedir)
+            self.evaluate(epoch, mode='eval', savedir=savedir)
+
             self._train(self.dataloader)
             self.lrscheduler.step()
 
-    def _evaluate(self, dataloader):
+    def evaluate(self, epoch, mode='eval', savedir=None):
+        with torch.no_grad():
+            metrics = {}
+            dice = self._evaluate(self.dataloader['labeled'], mode)
+            logger.info('at epoch: {:3d}, under {} mode, labeled_data dice: {:.3f} '.format(epoch, mode, dice))
+            # self.writer.add_scalar('%s/labeled' % self.name, dice, epoch)
+            metrics['%s/labeled' % self.name] = dice
+            dice = self._evaluate(self.dataloader['unlabeled'], mode)
+            logger.info('at epoch: {:3d}, under {} mode, unlabeled_data dice: {:.3f} '.format(epoch, mode, dice))
+            # self.writer.add_scalar('%s/unlabeled' % self.name, dice, epoch)
+            metrics['%s/unlabeled' % self.name] = dice
+            dice = self._evaluate(self.dataloader['val'], mode)
+            logger.info('at epoch: {:3d}, under {} mode, val_data dice: {:.3f} '.format(epoch, mode, dice))
+            # self.writer.add_scalar('%s/val' % self.name, dice, epoch)
+            metrics['%s/val' % self.name] = dice
+        if mode == 'eval':
+            self.writer.add_scalars(self.name, metrics, epoch)
+            self.checkpoint(dice, epoch, savedir)
+
+    def _evaluate(self, dataloader, mode='eval'):
+        assert mode in ('eval', 'train')
         dice_meter = AverageValueMeter()
-        self.torchnet.eval()
+        if mode == 'eval':
+            self.torchnet.eval()
+        else:
+            self.torchnet.train()
+
         with torch.no_grad():
             for i, (img, gt, _) in enumerate(dataloader):
                 img, gt = img.to(device), gt.to(device)
                 pred_logit = self.torchnet(img)
                 pred_mask = pred2segmentation(pred_logit)
                 dice_meter.add(dice_loss(pred_mask, gt))
-        self.torchnet.train()
+        if mode == 'eval':
+            self.torchnet.train()
+        assert self.torchnet.training == True
         return dice_meter.value()[0]
-
-    def evaluate(self, epoch, savedir=None):
-
-        with torch.no_grad():
-            metrics = {}
-            dice = self._evaluate(self.dataloader['labeled'])
-            logger.info('at epoch: {:3d}, labeled_data dice: {:.3f} '.format(epoch, dice))
-            # self.writer.add_scalar('%s/labeled' % self.name, dice, epoch)
-            metrics['%s/labeled' % self.name] = dice
-            dice = self._evaluate(self.dataloader['unlabeled'])
-            logger.info('at epoch: {:3d}, unlabeled_data dice: {:.3f} '.format(epoch, dice))
-            # self.writer.add_scalar('%s/unlabeled' % self.name, dice, epoch)
-            metrics['%s/unlabeled' % self.name] = dice
-            dice = self._evaluate(self.dataloader['val'])
-            logger.info('at epoch: {:3d}, val_data dice: {:.3f} '.format(epoch, dice))
-            # self.writer.add_scalar('%s/val' % self.name, dice, epoch)
-            metrics['%s/val' % self.name] = dice
-            self.writer.add_scalars(self.name, metrics, epoch)
-        self.checkpoint(dice, epoch, savedir)
 
     @property
     def save_dict(self):
@@ -187,7 +197,7 @@ class FullysupervisedTrainer(Trainer):
         flags.DEFINE_float(cls.alias + 'weight_decay', default=0, help='weight_decay for full training')
         flags.DEFINE_multi_float(cls.alias + 'weight', default=[1, 1], help='weight balance for CE for full training')
         flags.DEFINE_string(cls.alias + 'loss_name', default='crossentropy', help='criterion used in the full training')
-        flags.DEFINE_string(cls.alias + 'optim_name', default='SGD', help='optimzer used in the full training')
+        flags.DEFINE_string(cls.alias + 'optim_name', default='Adam', help='optimzer used in the full training')
         flags.DEFINE_string(cls.alias + 'optim_option', default='{}', help='optimzer used in the full training')
         flags.DEFINE_string(cls.alias + 'scheduler', default='MultiStepLR', help='scheduler used in the full training')
 
@@ -206,9 +216,9 @@ class FullysupervisedTrainer(Trainer):
         self.criterion.to(device)
 
     def _train(self, dataloader):
+        assert self.torchnet.training == True
         for i, (img, gt, _) in enumerate(dataloader['labeled']):
             self.optim.zero_grad()
-            self.torchnet.eval()
             img, gt = img.to(device), gt.to(device)
             pred_logit = self.torchnet(img)
             loss = self.criterion(pred_logit, gt.squeeze(1))
@@ -254,6 +264,7 @@ class SemisupervisedTrainer(Trainer):
         self.criterion.to(device)
 
     def _train(self, dataloaders):
+        assert self.torchnet.training == True
         for i, ((limg, lgt, _), (uimg, ugt, _)) in enumerate(zip(dataloaders['labeled'], dataloaders['unlabeled'])):
             if self.hparam['update_labeled']:
                 self.optim.zero_grad()
@@ -377,7 +388,7 @@ def run(argv):
     del argv
 
     hparam = flags.FLAGS.flag_values_dict()
-    ## data for semi-supervised training
+    # data for semi-supervised training
     dataloaders = get_dataloader(hparam)
 
     ## networks and optimisers
