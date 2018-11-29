@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 import pseudolabel.mask_gene
 from myutils.myDataLoader import ISICdata
 from myutils.myENet import Enet
-from myutils.myLoss import CrossEntropyLoss2d
+from myutils.myLoss import CrossEntropyLoss2d, OracleLoss2d
 from myutils.myUtils import *
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ def get_dataloader(hparam):
     root = "../datasets/ISIC2018"
     labeled_data = ISICdata(root=root, model='labeled', mode='semi', transform=True,
                             dataAugment=False, equalize=False)
+    labeled_data.imgs = labeled_data.imgs[:int(len(labeled_data.imgs) * hparam['labeled_percentate'])]
     unlabeled_data = ISICdata(root=root, model='unlabeled', mode='semi', transform=True,
                               dataAugment=False, equalize=False)
     val_data = ISICdata(root=root, model='val', mode='semi', transform=True,
@@ -64,6 +65,11 @@ def get_dataloader(hparam):
     labeled_data = DataLoader(labeled_data, **labeled_loader_params)
     unlabeled_data = DataLoader(unlabeled_data, **unlabeled_loader_params)
     val_data = DataLoader(val_data, **val_loader_params)
+
+    logger.info('the size of labeled_data:{}, unlabeled_data:{}, val_data:{}'.format(labeled_data.__len__(),
+                                                                                     unlabeled_data.__len__(),
+                                                                                     val_data.__len__()))
+
     return {'labeled': labeled_data,
             'unlabeled': unlabeled_data,
             'val': val_data}
@@ -298,11 +304,14 @@ def get_default_parameter():
                          help='load_pretrain for self training')
     flags.DEFINE_string('model_path', default='', help='path to the pretrained model')
     flags.DEFINE_string('save_dir', default=None, help='path to save')
+    flags.DEFINE_float('labeled_percentate', default=1.0, help='how much percentage of labeled data you use')
 
 
 def get_citerion(lossname, **kwargs):
     if lossname == 'crossentropy':
         criterion = CrossEntropyLoss2d(**kwargs)
+    elif lossname == 'oracle':
+        criterion = OracleLoss2d(**kwargs)
     else:
         raise NotImplementedError
     return criterion

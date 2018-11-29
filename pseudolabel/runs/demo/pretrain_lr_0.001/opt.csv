@@ -1,0 +1,47 @@
+logtostderr,False
+alsologtostderr,False
+log_dir,
+v,0
+verbosity,0
+stderrthreshold,fatal
+showprefixforinfo,True
+run_with_pdb,False
+pdb_post_mortem,False
+run_with_profiling,False
+profile_file,
+use_cprofile_for_profiling,True
+only_check_args,False
+full_train__max_epoch,200
+full_train__milestones,"[20, 40, 60, 80, 100, 120, 140, 160, 180]"
+full_train__gamma,0.8
+full_train__lr,0.001
+full_train__weight_decay,0.0
+full_train__weight,"[1.0, 1.0]"
+full_train__loss_name,crossentropy
+full_train__optim_name,Adam
+full_train__optim_option,{}
+full_train__scheduler,MultiStepLR
+semi_train__max_epoch,200
+semi_train__milestones,"[20, 40, 60, 80, 100, 120, 140, 160, 180]"
+semi_train__gamma,0.8
+semi_train__lr,0.001
+semi_train__weight_decay,0.0
+semi_train__weight,"[1.0, 1.0]"
+semi_train__loss_name,crossentropy
+semi_train__optim_name,Adam
+semi_train__optim_option,{}
+semi_train__scheduler,MultiStepLR
+num_workers,4
+batch_size,4
+semi_train__update_labeled,True
+semi_train__update_unlabeled,True
+run_pretrain,True
+run_semi,False
+load_pretrain,True
+model_path,
+save_dir,demo/pretrain_lr_0.001
+?,False
+help,False
+helpshort,False
+helpfull,False
+helpxml,False
