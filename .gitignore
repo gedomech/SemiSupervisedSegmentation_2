@@ -17,3 +17,10 @@ myutils/__pycache__/
 .DS_Store
 pseudolabel/.DS_Store
 __pycache__/
+
+pseudolabels/*txt
+pseudolabels/*csv
+pseudolabels/*pth
+pseudolabels/*pdf
+pseudolabels/results
+
