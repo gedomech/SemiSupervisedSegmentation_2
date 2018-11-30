@@ -26,3 +26,33 @@ class JensenShannonDivergence(nn.Module):
         n, c, h, w = ensemble_probs.shape  # number of distributions
         mixture_dist = ensemble_probs.mean(0, keepdim=True).expand(n, c, h, w)
         return self.loss(torch.log(ensemble_probs), mixture_dist) / (h * w)
+
+
+class OracleLoss2d(nn.Module):
+    def __init__(self, weight=None, reduce=True, size_average=True):
+        super().__init__()
+        self.loss = nn.NLLLoss(weight, reduce=reduce, size_average=size_average)
+
+    def forward(self, outputs, targets):
+        """
+        :param outputs: Prediction of the model
+        :param targets: ground-truth
+        :return:
+        """
+
+        # producing the oracle mask to consider true predictions
+        _outputs = outputs.max(1)[1]
+        oracle_mask = (_outputs == targets).float()
+        # outputs = _outputs * oracle_mask.type(FloatTensor)
+        outputs = outputs * oracle_mask
+
+        # return self.loss(_outputs, targets)
+        return self.loss(F.log_softmax(outputs, 1), targets)
+
+if __name__ == '__main__':
+    img = torch.randn(1,3,44,44).float()
+    gt = torch.randint(0,3,(1,44,44)).long()
+    criterion = OracleLoss2d()
+    loss = criterion(img,gt)
+
+
