@@ -31,6 +31,8 @@ class JensenShannonDivergence(nn.Module):
 class OracleLoss2d(nn.Module):
     def __init__(self, weight=None, reduce=True, size_average=True):
         super().__init__()
+        weight = torch.Tensor(weight)
+
         self.loss = nn.NLLLoss(weight, reduce=reduce, size_average=size_average)
 
     def forward(self, outputs, targets):
@@ -44,7 +46,7 @@ class OracleLoss2d(nn.Module):
         _outputs = outputs.max(1)[1]
         oracle_mask = (_outputs == targets).float()
         # outputs = _outputs * oracle_mask.type(FloatTensor)
-        outputs = outputs * oracle_mask
+        outputs = outputs * oracle_mask.unsqueeze(1)
 
         # return self.loss(_outputs, targets)
         return self.loss(F.log_softmax(outputs, 1), targets)
