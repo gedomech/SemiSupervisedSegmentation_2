@@ -29,7 +29,7 @@ class JensenShannonDivergence(nn.Module):
 
 
 class OracleLoss2d(nn.Module):
-    def __init__(self, weight=None, reduce=True, size_averafetge=True):
+    def __init__(self, weight=None, reduce=True, size_average=True):
         super().__init__()
         self.loss = nn.NLLLoss(weight, reduce=reduce, size_average=size_average)
 
